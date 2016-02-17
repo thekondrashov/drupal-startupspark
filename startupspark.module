@@ -1,0 +1,1448 @@
+<?php
+
+/**
+ * @file
+ * Файл .module - основное содержимое, функционал.
+ *
+ * @link http://azbukaweb.ru/node/192 Drupal 7: С чего начать @endlink
+ * @link http://azbukaweb.ru/node/194 Вставка комментариев и реализация Вашего первого хука @endlink
+ * @link https://drupal.org/node/1354 Doxygen and comment formatting conventions @endlink
+ */
+
+// hook_menu() => hook_form() => hook_form_validate() =(success)=> hook_form_submit()
+// hook_block_info() => hook_block_view()
+// hook_form_alter() => hook_user_insert()
+
+
+/**
+ * Implements hook_init().
+ *
+ * This hook is run at the beginning of the page request.
+ *
+ * @link https://api.drupal.org/api/function/hook_init/7 @endlink
+ * @link https://api.drupal.ru/api/function/hook_init/6 @endlink
+ * @link https://drupal.stackexchange.com/a/9835 @endlink
+ */
+function startupspark_init() {
+
+  // include ctools modal
+  // https://drupal.org/node/1710566
+  drupal_add_library('system', 'drupal.ajax');
+  ctools_include('ajax');
+  ctools_include('modal');
+  ctools_modal_add_js();
+
+
+  if (theme_exists('bootstrap')) {
+    $root = drupal_get_path('module', 'startupspark');
+    drupal_add_css(
+      $root . '/css/overrides-paper.css',
+      array('group' => CSS_THEME, 'every_page' => TRUE)
+    );
+    // https://getbootstrap.com/components/#navbar-fixed-top
+    // https://stackoverflow.com/a/18562948
+    drupal_add_css(
+      'body.navbar-is-fixed-top{padding-top:70px !important}
+
+      /* fix content wrap problem on search page */
+      .vertical-tabs-panes{overflow:visible !important}
+      .vertical-tabs-panes > fieldset{padding-left:16px}
+      ',
+      array('type' => 'inline', 'group' => CSS_THEME, 'every_page' => TRUE)
+    );
+
+    // https://api.drupal.org/api/function/module_exists/7
+    if (module_exists('select2')) { // TRUE if the module is both installed and enabled
+      drupal_add_css(
+        $root . '/css/select2-bootstrap-paper.css',
+        array('group' => CSS_THEME, 'every_page' => TRUE)
+      );
+      drupal_add_css(
+        $root . '/css/custom-search.css',
+        array('group' => CSS_THEME, 'every_page' => TRUE)
+      );
+    }
+  }
+}
+
+
+// Helper function
+// Check if theme is enabled: https://drupal.stackexchange.com/a/59037
+function theme_exists($theme_name) {
+  $themes = list_themes();
+  return isset($themes[$theme_name]) && $themes[$theme_name]->status == 1;
+}
+
+
+/**
+ * Implements hook_help().
+ * Help text.
+ *
+ * Отображения помощи и дополнительной информации по модулю для пользователей.
+ *
+ * http://habr.ru/p/245117
+ * http://azbukaweb.ru/writing-comments-and-implementing-your-first-hook
+ * https://drupal.org/node/632280
+ * https://api.drupal.org/api/function/hook_help
+ *
+ * @param   string  $path  The router menu path.
+ * @param   array   $arg   Array that holds the current path as returned from arg() function
+ *
+ * @return  string
+ */
+function startupspark_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#startupspark':
+      return '<p>' . 'Выполнено Кондрашовым Александром.' . '</p>';
+      break;
+  }
+}
+
+
+/**
+ * Implements hook_menu().
+ *
+ * Автоматическое создание пунктов меню, табов.
+ *
+ * @link https://api.drupal.org/api/function/hook_menu/7 @endlink
+ * @link https://api.drupal.org/api/function/user_menu/7 @endlink
+ * @link https://api.drupal.org/api/function/menu_example_menu/7 @endlink
+ * @link https://api.drupal.org/comment/59249#comment-59249 Do not use t() for menu title and description @endlink
+ */
+function startupspark_menu() {
+  $items = array();
+
+  /**
+   * Страница настройки модуля
+   * ----------------------------------------------------------------------
+   */
+  $items['admin/config/content/startupspark'] = array(
+    // Передаваемое значение не должно быть завернуто в функцию t(): http://drupal-learning.com/node/88
+    'title' => 'Стартапы', // Заголовок пункта меню (<title> страницы)
+
+    // Описание пункта меню. То, что будет выводится на странице конфигурации под названием.
+    'description' => t('На данной странице можно настроить модуль Startups park.'),
+
+    // Функция, которая будет вызвана при открытии этой страницы.
+    'page callback' => 'drupal_get_form', // функция для вывода данных, возвращающая форму Drupal
+
+    // Аргументы, передаваемые вызываемой функции.
+    'page arguments' => array('startupspark_top_form'),
+
+    'access arguments' => array('administer site configuration'), // Право доступа.
+
+    // Тип страницы - способ подвязки страницы в систему меню CMS
+    // по умолчанию: MENU_NORMAL_ITEM
+    'type' => MENU_NORMAL_ITEM, // обыкновенная страница Drupal
+  );
+
+
+  /**
+   * Список самых популярных стартапов
+   * ----------------------------------------------------------------------
+   */
+  // redirect to `discover/top`
+  $items['discover'] = array(
+    'type'             => MENU_NORMAL_ITEM,
+    'title'            => 'Стартапы',
+    'description'      => t('Обзор стартапов.'),
+    'page callback'    => 'drupal_goto', // https://api.drupal.org/comment/60107#comment-60107
+    'page arguments'   => array('discover/top'),
+    'access callback'  => TRUE,
+  );
+  // Список самых популярных стартапов
+  $items['discover/top'] = array(
+    'type'             => MENU_NORMAL_ITEM,
+    //'file'             => 'startupspark.pages.inc',
+    'title'            => 'Популярные',
+    'menu_name'        => 'main-menu',
+    'description'      => t('Ежедневно обновляемый список самых популярных стартапов.'),
+    'page callback'    => 'startupspark_top_alltime_page',
+    'access callback'  => TRUE,
+  );
+  // Вкладка популярных за день
+  $items['discover/top/daily'] = array(
+    //'type'             => MENU_DEFAULT_LOCAL_TASK,
+    'type'             => MENU_LOCAL_TASK,
+    //'file'             => 'startupspark.pages.inc',
+    'title'            => 'За день',
+    'weight'           => 4, // TODO: it is assumed to add `monthly` (Popular This Month, За месяц) tab
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('startupspark_top_form'),
+    'access arguments' => array('access content'),
+  );
+  // Вкладка популярных за всё время
+  $items['discover/top/alltime'] = array(
+    'type'             => MENU_DEFAULT_LOCAL_TASK,
+    //'file'             => 'startupspark.pages.inc',
+    'title'            => 'За все время',
+    'weight'           => 1,
+  );
+  // Страница со всеми стартапами
+  $items['discover/top/alltime/all'] = array(
+    'type'             => MENU_LOCAL_ACTION,
+    'title'            => 'Показать все',
+    'page arguments'   => array(3),
+    'access callback'  => TRUE,
+  );
+
+
+  /**
+   * Страницы управления стартапом
+   * ----------------------------------------------------------------------
+   */
+  // Подробная информация о стартапе
+  $items['projects/%startup'] = array(
+    'type'             => MENU_NORMAL_ITEM,
+    //'file'             => 'startupspark.pages.inc',
+    'description'      => t('Страница с основной информацией о стартапе.'),
+    'page callback'    => 'startupspark_project_page',
+    'page arguments'   => array(1, 2),
+    'access callback'  => TRUE,
+  );
+  // Вкладка с обзором информации о стартапе
+  $items['projects/%startup/overview'] = array(
+    'type'             => MENU_DEFAULT_LOCAL_TASK,
+    'title'            => 'Обзор',
+  );
+  // Вкладка редактирования информации о стартапе
+  // TODO: need to be implemented!
+  $items['projects/%startup/edit'] = array(
+    'type'             => MENU_LOCAL_TASK,
+    'title'            => 'Редактирование',
+    'access arguments' => array('access custom user tab'),
+  );
+  // Вкладка удаления стартапа
+  // TODO: need to be implemented!
+  $items['projects/%startup/delete'] = array(
+    'type'             => MENU_LOCAL_TASK,
+    'title'            => 'Удаление',
+    'access arguments' => array('access custom user tab'),
+  );
+
+
+  /**
+   * Добавление информации о стартапе
+   * ----------------------------------------------------------------------
+   */
+  // Страница добавления информации о стартапе, если у данного пользователя нет добавленных
+  $items['user/%/project'] = array(
+    'type'             => MENU_LOCAL_TASK,
+    'title'            => 'Мой стартап',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('startupspark_add_startup_form', 1),
+    'access callback'  => TRUE,
+  );
+
+
+  /**
+   * Регистрация/аутентификация пользователя в модальных окнах
+   * ----------------------------------------------------------------------
+   */
+  $items['user/register/%ctools_js'] = array(
+    'type'             => MENU_NORMAL_ITEM,
+    'title'            => 'Регистрация',
+    'options'          => array('attributes' => array('class' => array('ctools-use-modal'))), // important line
+    'menu_name'        => 'user-menu',
+    'description'      => t('Ежедневно обновляемый список самых популярных стартапов.'),
+    'page callback'    => 'user_register_modal_callback',
+    'page arguments'   => array(2),
+    // Hide a menu item for anonymous user: https://drupal.org/node/1421926#comment-8440561
+    'access callback' => 'user_is_anonymous',
+  );
+  $items['user/login/%ctools_js'] = array(
+    'type'             => MENU_NORMAL_ITEM,
+    'title'            => 'Вход',
+    'weight'           => 1,
+    'options'          => array('attributes' => array('class' => array('ctools-use-modal'))),
+    'menu_name'        => 'user-menu',
+    'description'      => t('Вход на сайт.'),
+    'page callback'    => 'user_login_modal_callback',
+    'page arguments'   => array(2),
+    'access callback'  => 'user_is_anonymous',
+  );
+
+
+  /**
+   * Страница поиска стартапов
+   * ----------------------------------------------------------------------
+   */
+  $items['search/projects'] = array(
+    'title' => 'Поиск стартапов',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('form_search_projects'),
+    'access callback'  => TRUE,
+  );
+  // path with autocomplete function for projects
+  // The important thing to note here is that the custom autocomplete
+  // variable you’re passing via the URL is appearing first here,
+  // before the standard autocomplete text argument.
+  // http://complexdan.com?p=43
+  $items['search/projects/autocomplete/%'] = array(
+    'type' => MENU_CALLBACK, // https://drupal.stackexchange.com/a/81830
+    'page callback' => 'json_list_projects',
+    'page arguments' => array(3),
+    'access callback'  => TRUE,
+  );
+
+  return $items;
+}
+
+
+/**
+ * Implementation of hook_menu_link_alter
+ *
+ * @link https://drupal.stackexchange.com/a/4949 @endlink
+ */
+function startupspark_menu_link_alter(&$item) {
+  // TODO: replace it with other more accurate condition
+  switch ($item['link_path']) {
+    case 'user/register/%':
+    case 'user/login/%':
+      // A flag to indicate that the user has manually created or edited the link
+      // (1 = customized, 0 = not customized).
+      $item['customized'] = 1;
+
+      // The parent link ID (plid) is the mlid of the link above in the hierarchy,
+      // or zero if the link is at the top level in its menu.
+      $item['plid'] = 0;
+
+      // The depth relative to the top level. A link with plid == 0 will have depth == 1.
+      //$item['depth'] = 1;
+      break;
+  }
+}
+
+
+/**
+ * Page callback.
+ */
+function startupspark_project_page($startup, $action = NULL) {
+
+  drupal_set_title('');
+
+  if (!empty($action)) {
+    switch ($action) {
+
+      // redirect to `projects/%name`.
+      case 'overview':
+        return drupal_goto('projects/' . $startup->name);
+
+      // TODO: Call edit form here.
+      case 'edit':
+        return t('Редактирование');
+
+      // TODO: Call delete form here.
+      case 'delete':
+        return t('Удаление');
+
+      // only listed above allowed. if no match, set 404 code.
+      default:
+        // Use exit() if you're seeing two error pages:
+        // https://api.drupal.org/api/drupal/includes!common.inc/function/drupal_not_found/7#comment-23683
+        drupal_not_found();
+        exit;
+    }
+  }
+
+  $prefix = variable_get('startupspark_schema_prefix');
+
+  // Инкремент значения поля с количеством просмотров.
+  db_update($prefix . 'startup')
+    ->expression('view_count', 'view_count + 1')
+    ->condition('id', $startup->id)
+    ->execute();
+
+
+  $uids = db_select($prefix . 'staff', 'sf')
+    ->fields('sf', array('id_user'))
+    ->condition('sf.id_startup', $startup->id)
+    ->range(0, 10)
+    ->execute()
+    ->fetchCol();
+
+  $rows = array();
+  if(!empty($uids)) {
+    $users = db_select('users', 'u')
+      ->fields('u', array('name'))
+      ->condition('u.uid', $uids, 'IN')
+      ->execute()
+      ->fetchCol();
+
+    foreach ($users as $user) {
+      $rows[] = array($user);
+    }
+  }
+
+  $header = array(
+    t('Имя пользователя'),
+  );
+  $output = theme(
+    'table', array('header' => $header, 'rows' => $rows)
+  );
+
+  $variables = array(
+    'startup' => $startup,
+    'staff'   => $output,
+  );
+  $output = theme('startupspark-overview', $variables);
+  return $output;
+}
+
+
+/**
+ * Page callback.
+ *
+ * @link http://alvinalexander.com/drupal/drupal-7-form-theme-table-module-example A Drupal 7 form table example @endlink
+ * @link http://drupalguide.ru/articles/database-api-drupal-7-vyborka-dannyh-i-ih-udalenie-dbselect-dbquery-i-dbdelete-chast-3 @endlink
+ * @link http://knackforge.com/node/120 Creating pager in Drupal (without db_select() and PagerDefault) @endlink
+ */
+function startupspark_top_alltime_page($arg = NULL) {
+
+  $prefix = variable_get('startupspark_schema_prefix');
+  $per_page = 15;
+
+  // execute the query
+  $results = db_select($prefix . 'startup', 's')
+    ->extend('PagerDefault')
+    ->fields('s', array('name', 'logo', 'title', 'description', 'category', 'view_count'))
+    ->orderBy('s.view_count', 'DESC')
+    ->limit($per_page)
+    ->execute();
+
+  $rows = array();
+  foreach ($results as $row) {
+    $rows[] = array(
+      'logo'        => $row->logo,
+      'name'        => $row->name,
+      'title'       => $row->title,
+      'category'    => $row->category,
+      'view_count'  => $row->view_count,
+      'description' => $row->description,
+    );
+  }
+  $variables = array(
+    'content' => $rows,
+  );
+  $output = theme('startupspark-discover', $variables);
+
+  if (NULL != $arg) {
+    $page_level = pager_find_page() * $per_page;
+    $range = ($page_level + 1) . '-' . ($page_level + $per_page);
+    drupal_set_title('Популярные стартапы #' . $range);
+
+    $output .= theme('pager');
+  } else {
+    drupal_set_title('Популярные стартапы');
+  }
+  return $output;
+}
+
+
+/**
+ * Form builder.
+ *
+ * @link https://drupal.org/node/854216 Textfield that uses autocomplete @endlink
+ * @link https://drupal.stackexchange.com/q/81810 @endlink
+ */
+function form_search_projects($form, &$form_state) {
+
+  // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#default_tab
+  $form['vertical_tabs'] = array(
+    '#type' => 'vertical_tabs',
+  );
+  $form['tab1'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('По роду деятельности'),
+    '#collapsible' => TRUE,
+    '#group' => 'vertical_tabs',
+    '#description' => t('Введите ключевое слово для поиска в поле ввода ниже и нажмите Enter или Tab.'),
+  );
+  $default_value = '';
+  if($cache = cache_get('search-keyword')) {
+    $default_value = $cache->data;
+    cache_clear_all('search-keyword', 'cache', TRUE);
+  }
+  // Autocomplete field
+  $form['tab1']['keyword'] = array(
+    '#type'              => 'textfield',
+    '#size'              => 30,
+    '#title'             => t('Род деятельности (например, спорт).'),
+    '#attributes'        => array('placeholder' => array(t('Ключевое слово'))),
+    '#description'       => t('Введите ключевое слово (например: спорт)'),
+    '#default_value'     => $default_value,
+    // Define an autocomplete callback for textfield,
+    '#autocomplete_path' => 'search/projects/autocomplete/category',
+
+    // sets up a callback that will fire every time the value of the field is changed.
+    '#ajax' => array(
+      'callback' => 'custom_forms_category_update',
+      'keypress' => TRUE,
+      'progress' => array(
+        'message' => t('Поиск...'),
+        'type' => 'bar', // throbber (default)
+      ),
+    ),
+  );
+
+  $form['tab2'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('По количеству участников'),
+    '#collapsible' => TRUE,
+    '#group' => 'vertical_tabs',
+    '#description' => t('Для того, чтобы начать поиск, передвиньте ползунок в желаемую позицию.'),
+  );
+
+  $query = db_select(variable_get('startupspark_schema_prefix') . 'startup');
+  // Найти максимальное значение: http://xandeadx.ru/blog/drupal/88
+  // Selecting the Max and Min records in one MySQL command: https://stackoverflow.com/a/4254586
+  // Not chainable! https://api.drupal.org/api/function/SelectQuery::addExpression/7#comment-43713
+  $query->addExpression('MIN(staff_count)');
+  $query->addExpression('MAX(staff_count)');
+
+  // list() will give an error if the input array is too short.
+  // use array_pad on the array to ensure its length: https://php.net/list#113189
+  // can list() work with associative arrays somehow? https://stackoverflow.com/a/21136003
+  list($min, $max) = array_pad(array_values($query->execute()->fetchAssoc()), 2, 10);
+
+  $range = '[' . $min . ',' . $max . ']';
+
+  // http://complexdan.com?p=43
+  $form['tab2']['rangefield'] = array(
+    '#id' => 'rangefield',
+    '#type' => 'textfield',
+    '#prefix' => '<p class="control-label" for="rangefield">Искать в указанном диапазоне:</p><br>',
+    '#default_value' => 1,
+    '#ajax' => array(
+      'callback' => 'custom_forms_count_update',
+      'event' => 'finishedinput', // custom jQuery event: https://drupal.stackexchange.com/a/123479
+      'progress' => array(
+        'message' => t('Поиск...'),
+        'type' => 'bar',
+      ),
+    ),
+    // https://github.com/seiyria/bootstrap-slider
+    '#attributes'    => array(
+      'data-slider-min'  => $min,
+      'data-slider-max'  => $max,
+      'data-slider-value'  => $range,
+      'data-slider-range'  => TRUE,
+      'data-slider-ticks'  => $range,
+      'data-slider-ticks-labels'  => '["Минимум (' . $min . ')", "Максимум (' . $max . ')"]',
+      'data-slider-tooltip-split'  => TRUE,
+    ),
+    '#attached' => array(
+      'css' => array(
+        array(
+          'data'             => 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/6.0.16/css/bootstrap-slider.min.css',
+          'group'            => CSS_THEME,
+          'type'  => 'external',
+        ),
+        array(
+          'data'             => '.slider-selection{background:#d099d9}',
+          'group'            => CSS_THEME,
+          'type'  => 'inline',
+        ),
+      ),
+      'js' => array(
+        array(
+          'type'  => 'external',
+          'data'  => 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/6.0.16/bootstrap-slider.min.js',
+          'scope' => 'header',
+        ),
+        array(
+          'type'  => 'inline',
+          'data'  => ';(function($) {
+              $(\'#rangefield\')
+              .slider()
+              .on(\'slideStart\', function(e) {
+                // store start value
+                $(this).data(\'oldRange\', e.target.value);
+              })
+              .on(\'slideStop\', function(e) {
+                // compare new and previously stored value to prevent extra requests
+                if ($(this).data(\'oldRange\') !== e.target.value) {
+                  $(this).trigger(\'finishedinput\');
+                }
+              });
+            })(window.jQuery);',
+          'scope' => 'footer',
+        ),
+      ),
+    ),
+  );
+
+  // Здесь будут результаты.
+  // http://complexdan.com?p=43
+  $form['results'] = array(
+    '#markup' => '',
+    '#prefix' => '<div id="container-results">',
+    '#suffix' => '</div>',
+  );
+
+  return $form;
+}
+
+function form_search_projects_block($form, &$form_state) {
+
+  $query = db_select(variable_get('startupspark_schema_prefix') . 'startup');
+  $query->addExpression('MIN(staff_count)');
+  $query->addExpression('MAX(staff_count)');
+
+  list($min, $max) = array_pad(array_values($query->execute()->fetchAssoc()), 2, 10);
+
+  $range = '[' . $min . ',' . $max . ']';
+
+  $form['fieldset1'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('По количеству участников'),
+    //'#weight' => 5,
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#states' => array(
+      'collapsed' => array(
+        ':input[name="keyword"]' => array('empty' => FALSE),
+      ),
+    ),
+  );
+
+  $form['fieldset1']['rangefield'] = array(
+    '#id' => 'rangefield',
+    '#type' => 'textfield',
+    '#prefix' => '<p class="control-label" for="rangefield">Диапазон:</p><br>',
+    '#default_value' => 1,
+    // https://github.com/seiyria/bootstrap-slider
+    '#attributes'    => array(
+      'data-slider-min'  => $min,
+      'data-slider-max'  => $max,
+      'data-slider-value'  => $range,
+      'data-slider-range'  => TRUE,
+      'data-slider-ticks'  => $range,
+      'data-slider-ticks-labels'  => '["От ' . $min . '", "До ' . $max . '"]',
+      'data-slider-tooltip-split' => TRUE,
+    ),
+    '#attached' => array(
+      'css' => array(
+        array(
+          'data'             => 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/6.0.16/css/bootstrap-slider.min.css',
+          'group'            => CSS_THEME,
+          'type'  => 'external',
+        ),
+        array(
+          'data'             => '.slider-selection{background:#d099d9}.slider.slider-horizontal{width:90%;margin-left:10px}',
+          'group'            => CSS_THEME,
+          'type'  => 'inline',
+        ),
+      ),
+      'js' => array(
+        array(
+          'type'  => 'external',
+          'data'  => 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/6.0.16/bootstrap-slider.min.js',
+          'scope' => 'header',
+        ),
+        array(
+          'type'  => 'inline',
+          'data'  => ';(function($) {
+              $(\'#rangefield\')
+              .slider();
+            })(window.jQuery);',
+          'scope' => 'footer',
+        ),
+      ),
+    ),
+  );
+
+  $form['fieldset1']['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => t('Найти'),
+  );
+
+  $form['fieldset2'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('По роду деятельности'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  // Autocomplete field
+  $form['fieldset2']['keyword'] = array(
+    '#type'              => 'textfield',
+    '#size'              => 30,
+    '#title'             => t('Род деятельности'),
+    '#attributes'        => array('placeholder' => array(t('Например, спорт'))),
+    '#description'       => t('Введите ключевое слово.'),
+    '#autocomplete_path' => 'search/projects/autocomplete/category',
+  );
+
+  $form['fieldset2']['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => t('Найти'),
+  );
+
+  return $form;
+}
+
+/**
+ * Drupal form submit handler.
+ */
+function form_search_projects_block_submit($form, &$form_state) {
+
+  // TODO: creates problems on concurrent requests!
+  if(!empty($form_state['values']['keyword'])) {
+    cache_set('search-keyword', $form_state['values']['keyword'], 'cache');
+  }
+
+  drupal_goto('search/projects');
+}
+
+
+/**
+ * Autocomplete callback.
+ * Function to get the autocomplete result.
+ * $string = string for search
+ *
+ * @link https://drupal.org/node/854216 @endlink
+ */
+function json_list_projects($type, $string) {
+
+  $prefix = variable_get('startupspark_schema_prefix');
+
+  // http://timonweb.com/posts/how-to-create-an-ajax-autocomplete-textfield-in-drupal-7/#c318
+  // Return the result to the form in json
+  drupal_json_output(
+    drupal_map_assoc(
+      db_select($prefix . 'startup', 's')
+        ->fields('s', array($type))
+        ->condition($type, '%' . db_like($string) . '%', 'LIKE')
+        ->range(0, 5) // only 5 results will show
+        ->orderby($type)
+        ->execute()
+        ->fetchCol()
+    )
+  );
+}
+
+
+/**
+ * AJAX callback.
+ *
+ * http://complexdan.com?p=43
+ */
+function custom_forms_category_update($form, &$form_state) {
+
+  // TODO: need to implement pager
+
+  $prefix = variable_get('startupspark_schema_prefix');
+
+  // execute the query
+  $results = db_select($prefix . 'startup', 's')
+    ->fields('s', array('name', 'logo', 'title', 'description', 'category', 'view_count'))
+    ->condition('s.category', '%' . db_like($form_state['values']['keyword']) . '%', 'LIKE')
+    ->orderBy('s.view_count', 'DESC')
+    ->execute();
+
+  $output = '';
+  $rows = 0;
+  foreach ($results as $row) {
+    $rows++;
+    $output .= theme('startupspark-list', array('content' => $row));
+  }
+
+  $output = '<h3>' . t('Найдено стартапов: ') . $rows . '</h3>' . $output;
+
+  $form['results'] = array(
+    '#markup' => $output,
+    '#prefix' => '<div id="container-results">',
+    '#suffix' => '</div>',
+  );
+
+  $commands[] = ajax_command_replace('#container-results', drupal_render($form['results']));
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+/**
+ * AJAX callback.
+ */
+function custom_forms_count_update($form, &$form_state) {
+
+  // TODO: need to implement pager
+
+  $prefix = variable_get('startupspark_schema_prefix');
+
+  // execute the query
+  $results = db_select($prefix . 'startup', 's')
+    ->fields('s')
+    // Использование оператора BETWEEN в условии: http://xandeadx.ru/blog/drupal/88
+    ->condition('s.staff_count', explode(',', $form_state['values']['rangefield']), 'BETWEEN')
+    ->orderBy('s.staff_count', 'DESC')
+    ->execute()
+    ->fetchAll();
+
+  // TODO: use plural function
+  $output = '<h3>' . t('Найдено стартапов: ') . sizeof($results) . '</h3>';
+
+  foreach ($results as $row) {
+    $output .= theme('startupspark-list', array('content' => $row));
+  }
+
+  $form['results'] = array(
+    '#markup' => $output,
+    '#prefix' => '<div id="container-results">',
+    '#suffix' => '</div>',
+  );
+
+  $commands[] = ajax_command_replace('#container-results', drupal_render($form['results']));
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+
+// http://zroger.com/blog/ajax-modal-windows/
+function user_register_modal_callback($js = FALSE) {
+  if ($js) {
+    ctools_include('ajax');
+    ctools_include('modal');
+    $form_state = array(
+      'ajax' => TRUE,
+      'title' => t('Регистрация на сайте'),
+    );
+    $output = ctools_modal_form_wrapper('user_register_form', $form_state);
+
+    if (!empty($form_state['submitted'])) { // https://drupal.org/node/1850410
+      if (!user_is_anonymous()) {
+
+        global $user;
+        $existing = user_load($user->uid);
+        $edit = (array) $existing;
+
+        $edit['startup_id']['und'][0]['value'] = 5;
+        user_save($existing, $edit);
+
+        $output[] = ctools_modal_command_loading();
+        $output[] = ctools_ajax_command_redirect('user/' . $user->uid . '/project');
+      }
+    }
+    print ajax_render($output);
+  } else {
+    return drupal_get_form('user_register_form');
+  }
+}
+
+function user_login_modal_callback($js = FALSE) {
+  if ($js) {
+    ctools_include('ajax');
+    ctools_include('modal');
+    $form_state = array(
+      'ajax' => TRUE,
+      'title' => t('Вход на сайт'),
+    );
+    $output = ctools_modal_form_wrapper('user_login', $form_state);
+
+    if (!empty($form_state['submitted'])) {
+      if (!user_is_anonymous()) {
+        $output[] = ctools_modal_command_loading();
+
+        global $user;
+
+        $prefix = variable_get('startupspark_schema_prefix');
+        $startup = db_select($prefix . 'staff', 'sf')
+          ->fields('sf', array('id_startup'))
+          ->condition('sf.id_user', $user->uid)
+          ->execute()
+          ->fetchField();
+
+        if(empty($startup)) {
+          $output[] = ctools_ajax_command_redirect('user/' . $user->uid . '/project');
+        } else {
+          $output[] = ctools_ajax_command_redirect('projects/' . $startup);
+        }
+      }
+    }
+    print ajax_render($output);
+  } else {
+    return drupal_get_form('user_login');
+  }
+}
+
+
+/**
+ * Implements hook_block_info().
+ *
+ * @link https://api.drupal.org/api/function/hook_block_info/7 @endlink
+ */
+function startupspark_block_info() {
+  $blocks['startup_filter'] = array(
+    'info' => t('Filter of startups'),
+    // https://api.drupal.org/api/drupal/includes!common.inc/group/block_caching/7
+    'cache' => DRUPAL_NO_CACHE,
+    'status' => 1,
+    'region' => 'sidebar_first',
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function startupspark_block_view($delta = '') {
+  $block = array();
+
+  // http://drupal.reea.net/node/78
+  switch ($delta) {
+    case 'startup_filter':
+
+      $block['title'] = t('Filter');
+
+      $form = drupal_get_form('form_search_projects_block');
+
+      // Using this technique, you can encapsulate the js and css loading in your module_block_view
+      // https://api.drupal.org/api/function/hook_block_info/7#comment-50868
+      // https://api.drupal.org/api/function/drupal_add_css/7#comment-53463
+      $block['content'] = array(
+        //'#markup' => theme(array('startupspark', 'startup_filter')),
+        '#markup' => drupal_render($form),
+        '#attached' => array('css' => array(drupal_get_path('module', 'startupspark').'/css/custom.css')),
+      );
+
+      return $block;
+      break;
+  }
+
+  return $block;
+}
+
+
+// Hiding a block based on code: https://drupal.stackexchange.com/a/31147
+// https://api.drupal.org/api/function/hook_block_list_alter/7
+function startupspark_block_list_alter(&$blocks) {
+
+  // https://api.drupal.org/api/function/request_path/7
+  if('search/projects' === request_path()) {
+    foreach ($blocks as $key => $block) {
+      if ('startup_filter' === $block->delta) {
+        unset($blocks[$key]);
+      }
+    }
+  }
+}
+
+/**
+ * Страница-заглушка
+ */
+function startupspark_top_form($form, &$form_state) {
+  $form['name']['#markup'] = '<em class="text-muted">Эта страница ещё не создана</em>';
+  return $form;
+}
+
+
+function startupspark_add_startup_form($form, &$form_state) {
+
+  // saving two lines of code: https://stackoverflow.com/q/8405386#comment35040665_8405715
+  $form['title']['#markup'] = '<h3>Участие в стартапе</h3>';
+  $form['message']['#markup'] = '<p><em>' . t('Можно одновременно учавствовать только в одном стартапе.') . '</em></p>';
+
+  // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#fieldset
+  $form['connect'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Присоединиться к существующему стартапу'),
+    '#collapsed' => FALSE,
+  );
+  // Autocomplete field
+  $form['connect']['exist'] = array(
+    '#type'              => 'textfield',
+    '#size'              => 30,
+    '#suffix' => '
+      <span id="edit-exist" class="help-block">'
+      . t('Если не помните название, вы можете воспользоваться ')
+      . l(t('поиском'), '/search/projects', array('attributes' => array('target' => '_blank')))
+      . '.</span>',
+    '#attributes'        => array('placeholder' => array(t('Начните вводить название...'))),
+    '#description'       => t('Введите любое слово из названия'),
+    '#autocomplete_path' => 'search/projects/autocomplete/title',
+
+    // sets up a callback that will fire every time the value of the field is changed.
+    '#ajax' => array(
+      'callback'         => 'custom_forms_startup_exist',
+      'keypress'         => TRUE,
+      'progress'         => array(
+        'message'        => t('Поиск...'),
+        'type'           => 'bar',
+      ),
+    ),
+  );
+
+  $form['connect']['results'] = array(
+    '#markup' => '',
+    '#prefix' => '<div id="container-results">',
+    '#suffix' => '</div>',
+  );
+
+  $form['connect']['submit'] = array(
+    '#type'       => 'submit',
+    '#value'      => t('Присоединиться'),
+    '#attributes' => array('class' => array('btn-primary')),
+    '#states'     => array(
+      'enabled' => array(
+        ':input[name="exist"]' => array('empty' => FALSE),
+      ),
+    ),
+    //'#validate'   => array('startupspark_connect_to_exist_form_validate'),
+    '#submit'     => array('startupspark_connect_to_exist_form_submit'),
+  );
+
+  $form['new'] = array(
+    '#type'   => 'fieldset',
+    '#title'  => t('Создать новый стартап'),
+  );
+  $form['new']['title'] = array(
+    '#type'        => 'textfield',
+    '#title'       => t('Название'),
+    '#description' => t('Короткое название, характеризующее ваш проект.'),
+    '#attributes'  => array('placeholder' => array(t('Например, Работающий вечный двигатель'))),
+    '#maxlength'   => 100,
+  );
+  $form['new']['description'] = array(
+    '#type'        => 'textarea',
+    '#title'       => t('Описание'),
+    '#description' => t('Подробно опишите ваш проект, чтобы о нём могло узнать как можно больше людей.'),
+    '#attributes'  => array('placeholder' => array('Миссия проекта, цели и т.д.')),
+  );
+  // Autocomplete field
+  $form['new']['category'] = array(
+    '#type'              => 'textfield',
+    '#size'              => 30,
+    '#title'             => t('Род деятельности'),
+    '#attributes'        => array('placeholder' => array(t('Например, спорт'))),
+    '#description'       => t('Род деятельности / категория. Или выберете из списка уже имеющихся.'),
+    '#autocomplete_path' => 'search/projects/autocomplete/category',
+  );
+
+  $form['new']['logo'] = array(
+    '#type'               => 'managed_file',
+    '#title'              => t('Block image'),
+    '#progress_indicator' => 'throbber',
+    '#progress_message'   => 'Uploading ...',
+    '#upload_location'    => 'public://startups/',
+    '#description'        => t('Allowed extensions: gif png jpg jpeg'),
+    '#upload_validators'  => array(
+      'file_validate_extensions' => array('gif png jpg jpeg'),
+      // Pass the maximum file size in bytes
+      'file_validate_size' => array(1 * 1024 * 1024),
+      //'file_validate_size' => array(0.3*1024*1024),
+      // https://drupal.stackexchange.com/a/35001
+      'file_validate_image_resolution' => array('100x100'), // array('600x400','300x200'),
+      //'file_validate_is_image' => array(),
+    ),
+    //'#default_value' => variable_get('logo', ''),
+  );
+
+  $form['new']['funder'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Инвесторы'),
+    '#description' => t('Список инвесторов проекта.'),
+  );
+  $form['new']['contact'] = array(
+    '#type'             => 'textarea',
+    '#title'             => t('Контактные данные'),
+    '#description'       => t('Укажите контактные данные в свободной форме. В качестве подсказки вы можете придерживаться приведённого образца.'),
+    '#attributes'        => array('placeholder' => array(str_replace('\n', PHP_EOL, 'Twitter, Inc.\n1355 Market Street, Suite 900\nSan Francisco, CA 94103\nP: (123) 456-7890'))),
+  );
+
+  $form['new']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Создать'),
+    '#attributes' => array('class' => array('btn-primary')),
+    '#suffix' => '<p><em>' . t('Вы автоматически будете добавлены в список ключевых участников нового стартапа.') . '</em></p>',
+    //'#validate' => array('startupspark_add_startup_form_validate'),
+    '#submit' => array('startupspark_add_startup_form_submit'),
+  );
+
+  return $form;
+}
+
+
+/*// Проверка полей формы на ошибки ввода
+function startupspark_add_startup_form_validate($form, &$form_state) {
+
+  $prefix = variable_get('startupspark_schema_prefix');
+
+  $startup = db_select($prefix . 'startup', 's')
+    ->fields('s', array('id'))
+    ->condition('s.title', $form_state['values']['exist'])
+    ->execute()
+    ->fetchField();
+
+  if(!empty($startup)) {
+    form_set_error('title', 'Стартап с таким названием уже существует.');
+  }
+
+  if(mb_strlen($form_state['values']['title']) < 3) {
+    form_set_error('title', 'Слишком короткое название.');
+  }
+
+  //form_error($form, t('add_startup_form_validate'));
+}*/
+
+
+function startupspark_connect_to_exist_form_submit($form, &$form_state) {
+
+  $prefix = variable_get('startupspark_schema_prefix');
+
+  $startup = db_select($prefix . 'startup', 's')
+    ->fields('s', array('id'))
+    ->condition('s.title', $form_state['values']['exist'])
+    ->execute()
+    ->fetchField();
+
+  if(empty($startup)) {
+    drupal_set_message('Стартап с таким названием не найден! Проверьте правильность введённого названия.', 'error', FALSE);
+  } else {
+    global $user;
+
+    // Merge queries using db_merge: https://drupal.org/node/310085
+    // db_merge function is very useful - it inserts data if they absent or updates it
+    // Insert a row in the db, or update the existing if it's already there.
+    // https://drupal.stackexchange.com/a/1350
+    db_merge($prefix . 'staff')
+      ->insertFields(array(
+        'id_user' => $user->uid,
+        'id_startup' => +$startup,
+      ))
+      ->updateFields(array(
+        'id_startup' => +$startup,
+      ))
+      ->key(array('id_user' => $user->uid))
+      ->execute();
+
+    drupal_set_message('Настройки успешно обновлены.');
+    drupal_goto('projects/' . $startup);
+  }
+}
+
+function startupspark_add_startup_form_submit($form, &$form_state) {
+
+  $file = '';
+  // https://drupal.stackexchange.com/a/25518
+  if (isset($form_state['values']['logo'])) {
+    $file = file_load($form_state['values']['logo']);
+    $file->status = FILE_STATUS_PERMANENT;
+    file_save($file);
+
+    //$validators = array('file_validate_extensions' => array('jpg jpeg'));
+    //$file = file_save_upload('logo', $validators, 'public://');
+    //if($file == false) {
+    //  drupal_set_message(t("Error saving image."), $type = "error", $repeat = false);
+    //}
+    //else{
+    //  $file->status = FILE_STATUS_PERMANENT;
+    //  $file = file_save($file);
+    //}
+  }
+
+
+  $prefix = variable_get('startupspark_schema_prefix');
+
+  $startup = db_insert($prefix . 'startup')
+    ->fields(array(
+      'name' => sanitize($form_state['values']['title']),
+      'logo' => $file->uri,
+      'title' => $form_state['values']['title'],
+      'contact' => $form_state['values']['contact'],
+      'category' => $form_state['values']['category'],
+      'description' => $form_state['values']['description'],
+      'funder' => $form_state['values']['funder'],
+      'staff_count' => 1,
+    ))
+    ->execute();
+
+  if(empty($startup)) {
+    drupal_set_message('Произошла ошибка при добавлении.', 'error');
+  } else {
+    global $user;
+
+    db_merge($prefix . 'staff')
+      ->insertFields(array(
+        'id_user' => $user->uid,
+        'id_startup' => +$startup,
+      ))
+      ->updateFields(array(
+        'id_startup' => +$startup,
+      ))
+      ->key(array('id_user' => $user->uid))
+      ->execute();
+
+    drupal_set_message('Стартап успешно добавлен.');
+    drupal_goto('projects/' . $startup);
+  }
+}
+
+
+/**
+ * Helper function: sanitize
+ * Returns a sanitized string, typically for URLs.
+ *
+ * @link https://stackoverflow.com/a/2668953 @endlink
+ *
+ * Parameters:
+ *     $string - The string to sanitize.
+ *     $force_lowercase - Force the string to lowercase?
+ *     $anal - If set to *true*, will remove all non-alphanumeric characters.
+ */
+function sanitize($string, $force_lowercase = true, $anal = false) {
+  $strip = array("~", "`", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "=", "+", "[", "{", "]",
+    "}", "\\", "|", ";", ":", "\"", "'", "&#8216;", "&#8217;", "&#8220;", "&#8221;", "&#8211;", "&#8212;",
+    "â€”", "â€“", ",", "<", ".", ">", "/", "?");
+  $clean = trim(str_replace($strip, "", strip_tags($string)));
+  $clean = preg_replace('/\s+/', "-", $clean);
+  $clean = ($anal) ? preg_replace("/[^a-zA-Z0-9]/", "", $clean) : $clean ;
+  return ($force_lowercase) ?
+    (function_exists('mb_strtolower')) ?
+      mb_strtolower($clean, 'UTF-8') :
+      strtolower($clean) :
+    $clean;
+}
+
+
+/**
+ * AJAX callback.
+ */
+function custom_forms_startup_exist($form, &$form_state) {
+
+  if (empty($form_state['values']['exist'])) {
+    // TODO: need to test
+    return FALSE;
+  }
+
+  $prefix = variable_get('startupspark_schema_prefix');
+
+  // execute the query
+  $results = db_select($prefix . 'startup', 's')
+    ->fields('s')
+    ->condition('s.title', $form_state['values']['exist'])
+    ->range(0, 1)
+    ->execute()
+    ->fetchObject();
+
+  if (empty($results)) {
+    // TODO: need to test
+    return FALSE;
+  }
+  $output = '<h4>' . t('Краткая информация:') . '</h4>';
+  $output .= theme('startupspark-list', array('content' => $results));
+
+  $form['results'] = array(
+    '#markup' => $output,
+    '#prefix' => '<div id="container-results">',
+    '#suffix' => '</div>',
+  );
+
+  $commands[] = ajax_command_replace('#container-results', drupal_render($form['results']));
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+
+/**
+ * Implements hook_load().
+ *
+ * @link http://drupalace.ru/node/346 @endlink
+ */
+function startup_load($arg) {
+
+  // TODO: proper fetch from cache if exist
+
+  if ($cache = cache_get($arg)) {
+    return $cache->data;
+  }
+
+  // you must pass a STRING to ctype_digit function: http://php.net/ctype-digit#112040
+  $is_id = ctype_digit((string)$arg);
+
+  // fetch() should generally be avoided in favor of fetchObject() and fetchAssoc(),
+  // as the latter are more self-documenting.
+  // https://drupal.org/node/1251174
+  $startup = db_select(variable_get('startupspark_schema_prefix') . 'startup', 's')
+    ->fields('s')
+    ->condition($is_id ? 's.id' : 's.name', $arg)
+    ->range(0, 1) // get only one result: http://drupal.stackexchange.com/a/166593
+    ->execute()
+    ->fetchObject();
+
+  if (empty($startup)) {
+    // 404
+
+    // Note that a load function should return FALSE when it is unable to provide a loadable object.
+    // The menu routing system will return a 404 error in this case.
+    // https://api.drupal.org/api/drupal/modules%21system%21system.api.php/function/hook_menu/7
+    return FALSE;
+  }
+  if ($is_id) {
+    // redirect: `projects/%id` (short link) => `projects/%name` (main page)
+
+    // TODO: need to cache this value to prevent extra queries to db
+    cache_set($startup->name, $startup, 'cache');
+    drupal_set_message(t('Вы были перенаправлены на основную страницу стартапа.'));
+    drupal_goto('projects/' . $startup->name);
+  }
+  return $startup;
+}
+
+
+/**
+ * Implements hook_form_alter().
+ *
+ * Сurrently Drupal runs hook_form_alter AFTER hook_form_FORM_ID_alter.
+ * Some say it is safest to use hook_form_alter and a switch statement.
+ * https://stackoverflow.com/q/2264301#comment2351220_2302029
+ *
+ * @link https://github.com/aramboyajyan/drupal7-boilerplate @endlink
+ * @link https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7 @endlink
+ */
+function startupspark_form_alter(&$form, &$form_state, $form_id) {
+
+  /**
+   * General overrides.
+   */
+  switch ($form['#id']) {
+
+    // User login form.
+    // user_login
+    //case 'user-login':
+    //  break;
+
+    // User registration form.
+    // user_register_form
+    case 'user-register-form':
+    //case 'user-register-form--2': // TODO: choose way to prevent possible dublicates
+      $form['account']['name']['#weight'] = 0;
+
+      // TODO: need to delete from release
+      form_set_error('mail', t('В данный момент в azure пока не настроена оправка e-mail.'));
+      unset($form['account']['mail']['#description']);
+
+      $form['account']['label_main'] = array(
+        '#markup' => '<h3>' . t('Заполните учётные данные.') . '</h3>',
+        '#weight'        => -1,
+      );
+      $form['account']['pass'] = array(
+        '#type'          => 'password_confirm',
+        '#required'      => TRUE,
+        // We need to remove the label to get a nice version: https://wp.me/p3PJLY-gP
+        '#title_display' => 'invisible',
+      );
+
+      // Add a checkbox to registration form about agreeing to terms of use.
+      // https://api.drupal.org/api/function/hook_form_FORM_ID_alter/7
+      $form['account']['terms_of_use'] = array(
+        '#type'          => 'checkbox',
+        // I agree with the website's terms and conditions.
+        //t('I certify that I am over the age of 18 years old.'),
+        '#title'         => 'Я подтверждаю, что мне больше 18 лет.',
+        '#required'      => TRUE,
+      );
+      // Drupal 7 FAPI - Using form states for conditional field display: http://knackforge.com/node/77
+      // how to change value of submit button of comment form? http://drupal.stackexchange.com/a/40563
+      // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#states
+      $form['actions']['submit']['#states'] = array(
+        'disabled' => array(
+          ':input[name="terms_of_use"]' => array('checked' => FALSE),
+        ),
+        'enabled' => array(
+          ':input[name="terms_of_use"]' => array('checked' => TRUE),
+        ),
+      );
+      $form['actions']['submit']['#attributes'] = array('class' => array('btn-primary'));
+
+      break;
+  }
+
+  /**
+   * Specific overrides.
+   */
+  switch ($form_id) {
+
+    // Add missing bootstrap classes and role to search form.
+    // Темизация элементов формы поиска в Dpupal 7: http://master-web.info?p=3733
+    // TODO: you should change access to search box on `admin/people/permissions` page for non-admin users
+    // Search block not visible: https://drupal.org/node/1092502
+    case 'search_block_form':
+
+      $form['search_block_form']['#title_display'] = 'invisible'; // Toggle label visibilty
+      $form['search_block_form']['#attributes']['class'][] = 'form-control';
+      if (module_exists('select2')) {
+        $form['search_block_form']['#attributes']['class'][] = 'hidden';
+      }
+      $form['#attributes']['class'] = array('navbar-form');
+
+      if (module_exists('select2')) {
+        require_once DRUPAL_ROOT . '/includes/locale.inc'; // Necessary for country_get_list().
+        $select2 = array(
+          '#type' => 'select',
+          '#title' => t('Выберите страну (Select2 example)'),
+
+          // If returned values are identical to displayed values, you can use drupal_map_assoc()
+          // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#options
+          '#options' => drupal_map_assoc(country_get_list()),
+          '#empty_option' => t('Выберите страну'),
+          // https://select2.github.io/select2/#documentation
+          // https://select2.github.io/select2/#infinite
+          '#select2' => array(
+            'width' => '100%',
+            'allowClear' => FALSE, // display clear button
+            'placeholder' => 'Введите название',
+            'dropdownCssClass' => 'bigdrop', // apply css that makes the dropdown taller
+            'minimumInputLength' => 1,
+            'maximumInputLength' => 10,
+            'maximumSelectionSize' => 3,
+          ),
+        );
+
+        // https://php.net/array-merge
+        $form['search_block_form'] = array_merge($form['search_block_form'], $select2);
+      }
+
+      break;
+  }
+}
+
+
+/**
+ * Implements hook_theme().
+ *
+ * @link https://stackoverflow.com/a/8258798 @endlink
+ * @link https://github.com/aramboyajyan/drupal7-boilerplate/blob/master/boilerplate.module#L415 @endlink
+ */
+function startupspark_theme($existing, $type, $theme, $path) {
+  // Get the path to this module and define theme dir.
+  $module_path = drupal_get_path('module', 'startupspark');
+  $theme_dir   = $module_path . '/theme';
+
+  // Themable elements. Theme keys.
+  return array(
+    'startupspark-overview' => array(
+      // path to your template file
+      'path'      => $theme_dir,
+      // your template filename
+      'template'  => 'overview', // do not include .tpl.php
+      'variables' => array(
+        'startup' => NULL,
+        'staff'   => NULL,
+      ),
+    ),
+    'startupspark-discover' => array(
+      'path'      => $theme_dir,
+      'template'  => 'discover',
+      'variables' => array(
+        'title'   => NULL,
+        'content' => NULL
+      ),
+    ),
+    'startupspark-list' => array(
+      'path'      => $theme_dir,
+      'template'  => 'list',
+      'variables' => array(
+        'title'   => NULL,
+        'content' => NULL
+      ),
+    ),
+  );
+}

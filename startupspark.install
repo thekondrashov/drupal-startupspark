@@ -1,0 +1,239 @@
+<?php
+
+/**
+ * @file
+ * Contains install, update and uninstall functions for the module.
+ *
+ * @package     Startups park
+ * @since       7.x-0.1
+ *
+ * @link http://azbukaweb.ru/node/192 Drupal 7: С чего начать @endlink
+ * @link https://drupal.org/node/318 Coding standards @endlink
+ * @link http://trish.in/node/19 Drupal 7: пример создания модуля @endlink
+ * @link http://habr.ru/p/245117 Былина о том, как я Drupal и Яндекс.ПДД связывал @endlink
+ * @link http://habr.ru/p/200908 Drupal 7. Модуль подписок своими руками @endlink
+ */
+
+
+/**
+ * Implements hook_schema()
+ *
+ * @link https://drupal.org/node/876250 Writing .install files (Drupal 7.x) @endlink
+ * @link https://drupal.org/node/146843 Schema API @endlink
+ */
+function startupspark_schema() {
+
+  $prefix = 'startupspark_';
+  variable_set('startupspark_schema_prefix', $prefix);
+
+  // Startup table
+  $schema[$prefix . 'startup'] = array(
+    // Schema descriptions are no longer translated:
+    // https://drupal.org/node/224333#schema_translation
+    'description'   => 'Information about a startup.',
+    'fields'        => array(
+      'id'             => array(
+        'type'         => 'serial',
+        'unsigned'     => TRUE,
+        'not null'     => TRUE,
+        'description'  => 'The primary identifier for a table.'
+      ),
+      'name'        => array(
+        'type'         => 'varchar',
+        'length'       => 50,
+        'default'      => '',
+        'not null'     => TRUE,
+        'description'  => 'Short name of startup.'
+      ),
+      // TODO: choose a way to store images; at this moment, it's a relative path to image in server filesystem
+      // Do not store images in the database: https://stackoverflow.com/a/6472268
+      'logo'        => array(
+        'type'         => 'text',
+        'size'         => 'normal',
+        'default'      => NULL,
+        'description'  => 'Logo.'
+      ),
+      'title'       => array(
+        'type'         => 'varchar',
+        'length'       => 255,
+        'not null'     => TRUE,
+        'description'  => 'Name of startup.'
+      ),
+      'contact'     => array(
+        'type'         => 'text',
+        'size'         => 'normal',
+        'default'      => NULL,
+        'description'  => 'Contact details.'
+      ),
+      'category'    => array(
+        'type'         => 'varchar',
+        'length'       => 255,
+        'default'      => '',
+        'description'  => 'Category.'
+      ),
+      'view_count'  => array(
+        'type'         => 'int',
+        'default'      => 0,
+        'description'  => 'The number of page views.'
+      ),
+      'description' => array(
+        'type'         => 'text',
+        'size'         => 'normal',
+        'default'      => NULL,
+        'description'  => 'Description of startup.',
+        //'translatable' => TRUE,
+      ),
+      // TODO: it should be foreign key in future
+      'funder'      => array(
+        'type'         => 'text',
+        'size'         => 'normal',
+        'default'      => NULL,
+        'description'  => 'Funders.'
+      ),
+      'staff_count' => array(
+        'type'         => 'int',
+        'default'      => 0,
+        'description'  => 'Staff count.'
+      ),
+      /*
+       * TODO: store create date
+       * Data types: https://drupal.org/node/159605
+       * Note that Datetime support was removed from D7 db api - use mysql_type
+       * or pgsql_type if you want this functionality
+       * https://stackoverflow.com/q/8170779
+       */
+      // 'created'    => REQUEST_TIME,
+    ),
+    'indexes' => array(
+      'name'              => array('id', 'name'),
+      'index_category'    => array('category'),
+      'index_staff_count' => array('staff_count')
+    ),
+    'primary key' => array('id')
+  );
+
+
+  // Staff table
+  $schema[$prefix . 'staff'] = array(
+    'description' => 'Participant/employee.',
+    'fields'      => array(
+      'id'            => array(
+        'type'        => 'serial',
+        'unsigned'    => TRUE,
+        'not null'    => TRUE,
+        'description' => 'The primary identifier for a table.'
+      ),
+      'id_user'    => array(
+        'type'        => 'int',
+        'length'      => 10,
+        'not null'    => TRUE,
+        'description' => 'The identifier of user.'
+      ),
+      'id_startup'    => array(
+        'type'        => 'int',
+        'length'      => 10,
+        'not null'    => TRUE,
+        'description' => 'The identifier of startup.'
+      ),
+    ),
+    'foreign keys' => array(
+      'staff_startup' => array(
+        'table' => 'startup',
+        'columns' => array('id_startup' => 'id') // ('source_column' => 'referenced_column')
+      ),
+      'staff_users' => array(
+        'table' => 'users',
+        'columns' => array('id_user' => 'uid')
+      ),
+    ),
+    'primary key' => array('id'),
+  );
+
+  return $schema;
+}
+
+
+/**
+ * Implements hook_install().
+ */
+function startupspark_install() {
+
+  // Create my tables.
+  // drupal_install_schema('table_name');
+
+  /*
+  // Update the system weight and place it after a certain module.
+  // https://github.com/aramboyajyan/drupal7-boilerplate
+  $weight = db_select('system', 's')
+              ->fields('s', array('weight'))
+              ->condition('name', 'node')
+              ->execute()
+              ->fetchField();
+
+  db_update('system')
+    ->fields(array('weight' => $weight + 1))
+    ->condition('name', 'boilerplate')
+    ->execute();
+  */
+
+}
+
+
+/**
+ * Implements hook_enable().
+ *
+ * @link https://drupal.stackexchange.com/a/174451 @endlink
+ */
+function startupspark_enable() {
+  $block = array(
+    'status' => 1,
+    'weight' => 20,
+    'region' => 'sidebar_first',
+    'visibility' => 0,
+    'pages' => "search/projects",
+    'module' => 'startupspark',
+    'delta' => 'startup_filter',
+    'theme' => 'bootstrap',
+    //'custom' => 1,
+  );
+
+  db_merge('block')
+    ->key(array(
+      'module'=>$block['module'],
+      'delta'=> $block['delta'],
+      'theme'=> $block['theme']
+    ))
+    ->fields(array(
+      'status' => $block['status'],
+      'weight' => $block['weight'],
+      'region' => $block['region'],
+      'visibility' => $block['visibility'],
+      'pages' => $block['pages'],
+      //'custom' => $block['custom'],
+    ))
+    ->execute();
+
+  // Flush cache
+  //cache_clear_all();
+}
+
+
+
+/**
+ * Implements hook_uninstall().
+ *
+ * @link http://habr.ru/p/200340#comment_6928432 @endlink
+ * @link https://github.com/aramboyajyan/drupal7-boilerplate @endlink
+ * @link http://xandeadx.ru/blog/drupal/221 Удаление переменных при деинсталяции модуля @endlink
+ */
+function startupspark_uninstall() {
+
+  //variable_del('startupspark_schema_prefix');
+
+  // Remove all our variables at once.
+  db_delete('variable')->condition('name', 'startupspark_%', 'LIKE')->execute();
+
+  // TODO: don't forget to delete the custom records in the table `menu_links`!
+
+  // TODO: don't forget to delete the custom block in the table `block`!
+}

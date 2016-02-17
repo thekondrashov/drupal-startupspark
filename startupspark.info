@@ -1,0 +1,16 @@
+name = Startups park
+core = 7.x
+description = "
+  Агрегатор стартапов.
+  Любой человек может зарегистрироваться и добавить информацию о своём стартапе.
+  &copy; <a href=\"https://git.io/vgTbC\" target=\"_blank\">А. Н. Кондрашов</a>, 2016"
+
+version = 7.x-0.x
+package = Custom
+dependencies[] = menu
+dependencies[] = ctools
+dependencies[] = jquery_update
+; dependencies[] = locale
+; dependencies[] = elements
+
+configure = admin/config/content/startupspark

@@ -8,7 +8,7 @@
  * @since       7.x-0.1
  *
  * @link http://azbukaweb.ru/node/192 Drupal 7: С чего начать @endlink
- * @link https://drupal.org/node/318 Coding standards @endlink
+ * @link http://dgo.to/318 Coding standards @endlink
  * @link http://trish.in/node/19 Drupal 7: пример создания модуля @endlink
  * @link http://habr.ru/p/245117 Былина о том, как я Drupal и Яндекс.ПДД связывал @endlink
  * @link http://habr.ru/p/200908 Drupal 7. Модуль подписок своими руками @endlink
@@ -18,8 +18,8 @@
 /**
  * Implements hook_schema()
  *
- * @link https://drupal.org/node/876250 Writing .install files (Drupal 7.x) @endlink
- * @link https://drupal.org/node/146843 Schema API @endlink
+ * @link http://dgo.to/876250 Writing .install files (Drupal 7.x) @endlink
+ * @link http://dgo.to/146843 Schema API @endlink
  */
 function startupspark_schema() {
 
@@ -29,21 +29,21 @@ function startupspark_schema() {
   // Startup table
   $schema[$prefix . 'startup'] = array(
     // Schema descriptions are no longer translated:
-    // https://drupal.org/node/224333#schema_translation
+    // http://dgo.to/224333#schema_translation
     'description'   => 'Information about a startup.',
     'fields'        => array(
       'id'             => array(
         'type'         => 'serial',
         'unsigned'     => TRUE,
         'not null'     => TRUE,
-        'description'  => 'The primary identifier for a table.'
+        'description'  => 'Primary ID field for the table.',
       ),
       'name'        => array(
         'type'         => 'varchar',
-        'length'       => 50,
-        'default'      => '',
+        'length'       => 128,
+        //'default'      => '',
         'not null'     => TRUE,
-        'description'  => 'Short name of startup.'
+        'description'  => 'Unique ID for this object. Used to identify it programmatically.',
       ),
       // TODO: choose a way to store images; at this moment, it's a relative path to image in server filesystem
       // Do not store images in the database: https://stackoverflow.com/a/6472268
@@ -55,9 +55,9 @@ function startupspark_schema() {
       ),
       'title'       => array(
         'type'         => 'varchar',
-        'length'       => 255,
+        'length'       => 128,
         'not null'     => TRUE,
-        'description'  => 'Name of startup.'
+        'description'  => 'A human readable name of a startup.'
       ),
       'contact'     => array(
         'type'         => 'text',
@@ -97,7 +97,7 @@ function startupspark_schema() {
       ),
       /*
        * TODO: store create date
-       * Data types: https://drupal.org/node/159605
+       * Data types: http://dgo.to/159605
        * Note that Datetime support was removed from D7 db api - use mysql_type
        * or pgsql_type if you want this functionality
        * https://stackoverflow.com/q/8170779
@@ -109,7 +109,10 @@ function startupspark_schema() {
       'index_category'    => array('category'),
       'index_staff_count' => array('staff_count')
     ),
-    'primary key' => array('id')
+    'primary key' => array('id'),
+    //'unique keys' => array(
+    //  'name' => array('name'),
+    //),
   );
 
 
@@ -185,6 +188,13 @@ function startupspark_install() {
  * @link https://drupal.stackexchange.com/a/174451 @endlink
  */
 function startupspark_enable() {
+
+  // Backup site's front page.
+  variable_set('startupspark_backup_frontpage', variable_get('site_frontpage'));
+
+  // How to programmatically set the front page?: https://drupal.stackexchange.com/a/1888
+  variable_set('site_frontpage', 'discover/top');
+
   $block = array(
     'status' => 1,
     'weight' => 20,
@@ -217,23 +227,47 @@ function startupspark_enable() {
   //cache_clear_all();
 }
 
+/**
+ * Implements hook_disable().
+ *
+ * @link https://api.drupal.org/api/function/hook_disable/7 @endlink
+ */
+function startupspark_disable() {
+  // Restore site's front page.
+  variable_set('site_frontpage', variable_get('startupspark_backup_frontpage'));
+}
+
 
 
 /**
  * Implements hook_uninstall().
  *
+ * Note: when hook_uninstall() is called, your module will already be disabled,
+ * so its .module file will not be automatically included.
+ *
  * @link http://habr.ru/p/200340#comment_6928432 @endlink
  * @link https://github.com/aramboyajyan/drupal7-boilerplate @endlink
+ * @link https://drupal.stackexchange.com/a/68875 @endlink
+ * @link http://dgo.to/2274697 Proper way to bulk-delete variables on module uninstall @endlink
  * @link http://xandeadx.ru/blog/drupal/221 Удаление переменных при деинсталяции модуля @endlink
  */
 function startupspark_uninstall() {
 
-  //variable_del('startupspark_schema_prefix');
+  variable_del('startupspark_schema_prefix');
+  variable_del('startupspark_backup_frontpage');
 
   // Remove all our variables at once.
-  db_delete('variable')->condition('name', 'startupspark_%', 'LIKE')->execute();
+  //db_delete('variable')
+  //  ->condition('name', db_like('startupspark_') . '%', 'LIKE')
+  //  ->execute();
 
-  // TODO: don't forget to delete the custom records in the table `menu_links`!
+  // When you delete variables via `db_delete` it is good to also clear the variable cache.
+  //cache_clear_all('variables', 'cache_bootstrap');
 
-  // TODO: don't forget to delete the custom block in the table `block`!
+  // Delete the custom records in the table `menu_links`.
+  db_delete('menu_links')
+    ->condition('module', 'startupspark')
+    ->execute();
+
+  // No need to delete the custom block in the table `block`.
 }

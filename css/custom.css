@@ -1,3 +1,36 @@
+/**
+ * @file
+ * Startupspark stylesheet.
+ */
+
+/* ==========================================================================
+   Base styles: opinionated defaults.
+   ========================================================================== */
+
+/*
+ * The fixed navbar will overlay your other content,
+ * unless you add `padding` to the top of the `<body>`.
+ * By default, the navbar is 50px high.
+ * Make sure to include this after the core Bootstrap CSS:
+ * https://getbootstrap.com/components/#navbar-fixed-top
+ */
+
 body.navbar-is-fixed-top {
   padding-top: 70px !important;
+}
+
+/* ==========================================================================
+   Author's custom styles.
+   ========================================================================== */
+
+/*
+ * Fix content wrap problem on search page.
+ */
+
+.vertical-tabs-panes {
+  overflow: visible !important;
+}
+
+.vertical-tabs-panes > fieldset {
+  padding-left: 16px;
 }

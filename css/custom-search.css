@@ -1,42 +1,50 @@
-.navbar-form {
-  margin-bottom: 0;
-}
+/**
+ * @file
+ * Modifications for search_block_form.
+ */
+
+/* ==========================================================================
+   Base styles: opinionated defaults.
+   ========================================================================== */
+
+/*
+ * Bootstrap 3 - Maximize input width inside navbar:
+ * https://stackoverflow.com/a/18562948
+ */
 
 .navbar-form {
+  margin-bottom: 0;
   overflow: auto;
 }
+
+.navbar-form .input-group .input-group-btn {
+  width: 1%;
+}
+
 /*.navbar-form .form-control {
   display: table !important;
   display: inline-block;
   width: 100%;
   vertical-align: middle;
 }
+
 .navbar-form .input-group {
   display: inline;
 }*/
-.navbar-form .input-group .input-group-btn {
-  width: 1%;
-}
+
+/* ==========================================================================
+   Author's custom styles.
+   ========================================================================== */
+
+/*
+ * Media Queries for Responsive Design.
+ */
 
 @media (min-width: 992px) {
-  /*.navbar-form .input-group {
-    float: left;
-  }*/
-  /*.col-md-10 {
-    width: 83.33333333%;
-  }
-  .col-md-9 {
-    width: 75%;
-  }*/
   .navbar-form .input-group, .navbar-form .select2-container {
     width: 66.66666667%;
+    /*float: left;*/
   }
-  /*.col-md-7 {
-    width: 58.33333333%;
-  }
-  .col-md-6 {
-    width: 50%;
-  }*/
 }
 
 @media (min-width: 768px) and (max-width: 991px) {
@@ -46,10 +54,15 @@
 }
 
 @media (min-width: 992px) and (max-width: 1199px) {
+  /* Style adjustments for high resolution devices */
   .select2-chosen {
     width: 350px !important;
   }
 }
+
+/*
+ * A better looking on page load.
+ */
 
 /*.select2-container {
   display: block;

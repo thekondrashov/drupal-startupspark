@@ -27,10 +27,10 @@ function form_search_projects($form, &$form_state) {
   );
   $form['tab1'] = array(
     '#type' => 'fieldset',
-    '#title' => t('По роду деятельности'),
+    '#title' => 'По роду деятельности',
     '#collapsible' => TRUE,
     '#group' => 'vertical_tabs',
-    '#description' => t('Введите ключевое слово для поиска в поле ввода ниже и нажмите Enter или Tab.'),
+    '#description' => 'Введите ключевое слово для поиска в поле ввода ниже и нажмите Enter или Tab.',
   );
   $default_value = '';
   if($cache = cache_get('search-keyword')) {
@@ -41,9 +41,9 @@ function form_search_projects($form, &$form_state) {
   $form['tab1']['keyword'] = array(
     '#type'              => 'textfield',
     '#size'              => 30,
-    '#title'             => t('Род деятельности (например, спорт).'),
-    '#attributes'        => array('placeholder' => array(t('Ключевое слово'))),
-    '#description'       => t('Введите ключевое слово (например: спорт)'),
+    '#title'             => 'Род деятельности (например, спорт).',
+    '#attributes'        => array('placeholder' => array('Ключевое слово')),
+    '#description'       => 'Введите ключевое слово (например: спорт)',
     '#default_value'     => $default_value,
     // Define an autocomplete callback for textfield,
     '#autocomplete_path' => 'search/projects/autocomplete/category',
@@ -53,7 +53,7 @@ function form_search_projects($form, &$form_state) {
       'callback' => 'custom_forms_category_update',
       'keypress' => TRUE,
       'progress' => array(
-        'message' => t('Поиск...'),
+        'message' => 'Поиск...',
         'type' => 'bar', // throbber (default)
       ),
     ),
@@ -61,13 +61,13 @@ function form_search_projects($form, &$form_state) {
 
   $form['tab2'] = array(
     '#type' => 'fieldset',
-    '#title' => t('По количеству участников'),
+    '#title' => 'По количеству участников',
     '#collapsible' => TRUE,
     '#group' => 'vertical_tabs',
-    '#description' => t('Для того, чтобы начать поиск, передвиньте ползунок в желаемую позицию.'),
+    '#description' => 'Для того, чтобы начать поиск, передвиньте ползунок в желаемую позицию.',
   );
 
-  $query = db_select(variable_get('startupspark_schema_prefix') . 'startup');
+  $query = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup');
   // Найти максимальное значение: http://xandeadx.ru/blog/drupal/88
   // Selecting the Max and Min records in one MySQL command: https://stackoverflow.com/a/4254586
   // Not chainable! https://api.drupal.org/api/function/SelectQuery::addExpression/7#comment-43713
@@ -91,7 +91,7 @@ function form_search_projects($form, &$form_state) {
       'callback' => 'custom_forms_count_update',
       'event' => 'finishedinput', // custom jQuery event: https://drupal.stackexchange.com/a/123479
       'progress' => array(
-        'message' => t('Поиск...'),
+        'message' => 'Поиск...',
         'type' => 'bar',
       ),
     ),

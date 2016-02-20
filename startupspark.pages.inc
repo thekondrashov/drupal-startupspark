@@ -21,11 +21,11 @@ function startupspark_project_page($startup, $action = NULL) {
 
       // TODO: Call edit form here.
       case 'edit':
-        return t('Редактирование');
+        return 'Редактирование';
 
       // TODO: Call delete form here.
       case 'delete':
-        return t('Удаление');
+        return 'Удаление';
 
       // only listed above allowed. if no match, set 404 code.
       default:
@@ -64,7 +64,7 @@ function startupspark_project_page($startup, $action = NULL) {
   }
 
   $header = array(
-    t('Имя пользователя'),
+    'Имя пользователя',
   );
   $output = theme(
     'table', array('header' => $header, 'rows' => $rows)

@@ -137,7 +137,7 @@ function startupspark_menu() {
   $items['discover/top'] = array(
     'type'             => MENU_NORMAL_ITEM,
     'file'             => 'startupspark.pages.inc',
-    'title'            => 'Популярные стартапы',
+    'title'            => 'Популярные',
     'menu_name'        => 'main-menu',
     'description'      => 'Ежедневно обновляемый список самых популярных стартапов.',
     'page callback'    => 'startupspark_top_alltime_page',
@@ -178,7 +178,7 @@ function startupspark_menu() {
   $items['projects/%startup'] = array(
     'type'             => MENU_NORMAL_ITEM,
     'file'             => 'startupspark.pages.inc',
-    'description'      => t('Страница с основной информацией о стартапе.'),
+    'description'      => 'Страница с основной информацией о стартапе.',
     'page callback'    => 'startupspark_project_page',
     'page arguments'   => array(1, 2),
     'access callback'  => TRUE,
@@ -233,7 +233,7 @@ function startupspark_menu() {
     'title'            => 'Регистрация',
     'options'          => array('attributes' => array('class' => array('ctools-use-modal'))), // important line
     'menu_name'        => 'user-menu',
-    'description'      => t('Ежедневно обновляемый список самых популярных стартапов.'),
+    'description'      => 'Ежедневно обновляемый список самых популярных стартапов.',
     'page callback'    => 'user_register_modal_callback',
     'page arguments'   => array(2),
     // Hide a menu item for anonymous user: http://dgo.to/1421926#comment-8440561
@@ -245,7 +245,7 @@ function startupspark_menu() {
     'weight'           => 1,
     'options'          => array('attributes' => array('class' => array('ctools-use-modal'))),
     'menu_name'        => 'user-menu',
-    'description'      => t('Вход на сайт.'),
+    'description'      => 'Вход на сайт.',
     'page callback'    => 'user_login_modal_callback',
     'page arguments'   => array(2),
     'access callback'  => 'user_is_anonymous',
@@ -290,7 +290,7 @@ function startupspark_menu_link_alter(&$item) {
   switch($item['link_path']) {
     case 'user/register/%':
     case 'user/login/%':
-    case 'discover/top':
+    //case 'discover/top':
 
       // Check if already created.
       $mlid = db_select('menu_links', 'ml')
@@ -334,7 +334,7 @@ function form_search_projects_block($form, &$form_state) {
 
   $form['fieldset1'] = array(
     '#type' => 'fieldset',
-    '#title' => t('По количеству участников'),
+    '#title' => 'По количеству участников',
     //'#weight' => 5,
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
@@ -389,12 +389,12 @@ function form_search_projects_block($form, &$form_state) {
 
   $form['fieldset1']['submit'] = array(
     '#type'  => 'submit',
-    '#value' => t('Найти'),
+    '#value' => 'Найти',
   );
 
   $form['fieldset2'] = array(
     '#type' => 'fieldset',
-    '#title' => t('По роду деятельности'),
+    '#title' => 'По роду деятельности',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
@@ -403,15 +403,15 @@ function form_search_projects_block($form, &$form_state) {
   $form['fieldset2']['keyword'] = array(
     '#type'              => 'textfield',
     '#size'              => 30,
-    '#title'             => t('Род деятельности'),
-    '#attributes'        => array('placeholder' => array(t('Например, спорт'))),
-    '#description'       => t('Введите ключевое слово.'),
+    '#title'             => 'Род деятельности',
+    '#attributes'        => array('placeholder' => array('Например, спорт')),
+    '#description'       => 'Введите ключевое слово.',
     '#autocomplete_path' => 'search/projects/autocomplete/category',
   );
 
   $form['fieldset2']['submit'] = array(
     '#type'  => 'submit',
-    '#value' => t('Найти'),
+    '#value' => 'Найти',
   );
 
   return $form;
@@ -453,7 +453,7 @@ function custom_forms_category_update($form, &$form_state) {
     $output .= theme('startupspark-list', array('content' => $row));
   }
 
-  $output = '<h3>' . t('Найдено стартапов: ') . $rows . '</h3>' . $output;
+  $output = '<h3>Найдено стартапов: ' . $rows . '</h3>' . $output;
 
   $form['results'] = array(
     '#markup' => $output,
@@ -482,7 +482,7 @@ function custom_forms_count_update($form, &$form_state) {
     ->fetchAll();
 
   // TODO: use plural function
-  $output = '<h3>' . t('Найдено стартапов: ') . sizeof($results) . '</h3>';
+  $output = '<h3>Найдено стартапов: ' . sizeof($results) . '</h3>';
 
   foreach ($results as $row) {
     $output .= theme('startupspark-list', array('content' => $row));
@@ -506,7 +506,7 @@ function user_register_modal_callback($js = FALSE) {
     ctools_include('modal');
     $form_state = array(
       'ajax' => TRUE,
-      'title' => t('Регистрация на сайте'),
+      'title' => 'Регистрация на сайте',
     );
     $output = ctools_modal_form_wrapper('user_register_form', $form_state);
 
@@ -529,7 +529,7 @@ function user_login_modal_callback($js = FALSE) {
     ctools_include('modal');
     $form_state = array(
       'ajax' => TRUE,
-      'title' => t('Вход на сайт'),
+      'title' => 'Вход на сайт',
     );
     $output = ctools_modal_form_wrapper('user_login', $form_state);
 
@@ -566,7 +566,7 @@ function user_login_modal_callback($js = FALSE) {
  */
 function startupspark_block_info() {
   $blocks['startup_filter'] = array(
-    'info' => t('Filter of startups'),
+    'info' => 'Filter of startups',
     // https://api.drupal.org/api/drupal/includes!common.inc/group/block_caching/7
     'cache' => DRUPAL_NO_CACHE,
     'status' => 1,
@@ -586,7 +586,7 @@ function startupspark_block_view($delta = '') {
   switch ($delta) {
     case 'startup_filter':
 
-      $block['title'] = t('Filter');
+      $block['title'] = 'Filter';
 
       $form = drupal_get_form('form_search_projects_block');
 
@@ -626,12 +626,12 @@ function startupspark_add_startup_form($form, &$form_state) {
 
   // saving two lines of code: https://stackoverflow.com/q/8405386#comment35040665_8405715
   $form['title']['#markup'] = '<h3>Участие в стартапе</h3>';
-  $form['message']['#markup'] = '<p><em>' . t('Можно одновременно учавствовать только в одном стартапе.') . '</em></p>';
+  $form['message']['#markup'] = '<p><em>Можно одновременно учавствовать только в одном стартапе.</em></p>';
 
   // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#fieldset
   $form['connect'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Присоединиться к существующему стартапу'),
+    '#title' => 'Присоединиться к существующему стартапу',
     '#collapsed' => FALSE,
   );
   // Autocomplete field
@@ -640,11 +640,11 @@ function startupspark_add_startup_form($form, &$form_state) {
     '#size'              => 30,
     '#suffix' => '
       <span id="edit-exist" class="help-block">'
-      . t('Если не помните название, вы можете воспользоваться ')
-      . l(t('поиском'), '/search/projects', array('attributes' => array('target' => '_blank')))
+      . 'Если не помните название, вы можете воспользоваться '
+      . l('поиском', '/search/projects', array('attributes' => array('target' => '_blank')))
       . '.</span>',
-    '#attributes'        => array('placeholder' => array(t('Начните вводить название...'))),
-    '#description'       => t('Введите любое слово из названия'),
+    '#attributes'        => array('placeholder' => array('Начните вводить название...')),
+    '#description'       => 'Введите любое слово из названия',
     '#autocomplete_path' => 'search/projects/autocomplete/title',
 
     // sets up a callback that will fire every time the value of the field is changed.
@@ -652,7 +652,7 @@ function startupspark_add_startup_form($form, &$form_state) {
       'callback'         => 'custom_forms_startup_exist',
       'keypress'         => TRUE,
       'progress'         => array(
-        'message'        => t('Поиск...'),
+        'message'        => 'Поиск...',
         'type'           => 'bar',
       ),
     ),
@@ -666,7 +666,7 @@ function startupspark_add_startup_form($form, &$form_state) {
 
   $form['connect']['submit'] = array(
     '#type'       => 'submit',
-    '#value'      => t('Присоединиться'),
+    '#value'      => 'Присоединиться',
     '#attributes' => array('class' => array('btn-primary')),
     '#states'     => array(
       'enabled' => array(
@@ -679,28 +679,28 @@ function startupspark_add_startup_form($form, &$form_state) {
 
   $form['new'] = array(
     '#type'   => 'fieldset',
-    '#title'  => t('Создать новый стартап'),
+    '#title'  => 'Создать новый стартап',
   );
   $form['new']['title'] = array(
     '#type'        => 'textfield',
-    '#title'       => t('Название'),
-    '#description' => t('Короткое название, характеризующее ваш проект.'),
-    '#attributes'  => array('placeholder' => array(t('Например, Работающий вечный двигатель'))),
+    '#title'       => 'Название',
+    '#description' => 'Короткое название, характеризующее ваш проект.',
+    '#attributes'  => array('placeholder' => array('Например, Работающий вечный двигатель')),
     '#maxlength'   => 100,
   );
   $form['new']['description'] = array(
     '#type'        => 'textarea',
-    '#title'       => t('Описание'),
-    '#description' => t('Подробно опишите ваш проект, чтобы о нём могло узнать как можно больше людей.'),
+    '#title'       => 'Описание',
+    '#description' => 'Подробно опишите ваш проект, чтобы о нём могло узнать как можно больше людей.',
     '#attributes'  => array('placeholder' => array('Миссия проекта, цели и т.д.')),
   );
   // Autocomplete field
   $form['new']['category'] = array(
     '#type'              => 'textfield',
     '#size'              => 30,
-    '#title'             => t('Род деятельности'),
-    '#attributes'        => array('placeholder' => array(t('Например, спорт'))),
-    '#description'       => t('Род деятельности / категория. Или выберете из списка уже имеющихся.'),
+    '#title'             => 'Род деятельности',
+    '#attributes'        => array('placeholder' => array('Например, спорт')),
+    '#description'       => 'Род деятельности / категория. Или выберете из списка уже имеющихся.',
     '#autocomplete_path' => 'search/projects/autocomplete/category',
   );
 
@@ -725,22 +725,22 @@ function startupspark_add_startup_form($form, &$form_state) {
 
   $form['new']['funder'] = array(
     '#type'        => 'textarea',
-    '#title'       => t('Инвесторы'),
-    '#description' => t('Список инвесторов проекта.'),
+    '#title'       => 'Инвесторы',
+    '#description' => 'Список инвесторов проекта.',
   );
   $form['new']['contact'] = array(
     '#type'        => 'textarea',
-    '#title'       => t('Контактные данные'),
+    '#title'       => 'Контактные данные',
     '#attributes'  => array(
       'placeholder' => array("Twitter, Inc.\n1355 Market Street, Suite 900\nSan Francisco, CA 94103\nP: (123) 456-7890")
     ),
-    '#description' => t('Укажите контактные данные в свободной форме. В качестве подсказки вы можете придерживаться приведённого образца.'),
+    '#description' => 'Укажите контактные данные в свободной форме. В качестве подсказки вы можете придерживаться приведённого образца.',
   );
 
   $form['new']['submit'] = array(
     '#type'        => 'submit',
-    '#value'       => t('Создать'),
-    '#suffix'      => '<p><em>' . 'Вы автоматически будете добавлены в список ключевых участников нового стартапа.' . '</em></p>',
+    '#value'       => 'Создать',
+    '#suffix'      => '<p><em>Вы автоматически будете добавлены в список ключевых участников нового стартапа.</em></p>',
     //'#validate'    => array('startupspark_add_startup_form_validate'),
     '#submit'      => array('startupspark_add_startup_form_submit'),
     '#attributes'  => array('class' => array('btn-primary')),
@@ -881,7 +881,7 @@ function custom_forms_startup_exist($form, &$form_state) {
     // TODO: need to test
     return FALSE;
   }
-  $output = '<h4>' . t('Краткая информация:') . '</h4>';
+  $output = '<h4>Краткая информация:</h4>';
   $output .= theme('startupspark-list', array('content' => $results));
 
   $form['results'] = array(
@@ -934,7 +934,7 @@ function startup_load($arg) {
 
     // TODO: need to cache this value to prevent extra queries to db
     cache_set($startup->name, $startup, 'cache');
-    drupal_set_message(t('Вы были перенаправлены на основную страницу стартапа.'));
+    drupal_set_message('Вы были перенаправлены на основную страницу стартапа.');
     drupal_goto('projects/' . $startup->name);
   }
   return $startup;
@@ -970,11 +970,11 @@ function startupspark_form_alter(&$form, &$form_state, $form_id) {
       $form['account']['name']['#weight'] = 0;
 
       // TODO: need to delete from release
-      form_set_error('mail', t('В данный момент в azure пока не настроена оправка e-mail.'));
+      form_set_error('mail', 'В данный момент в azure пока не настроена оправка e-mail.');
       unset($form['account']['mail']['#description']);
 
       $form['account']['label_main'] = array(
-        '#markup' => '<h3>' . t('Заполните учётные данные.') . '</h3>',
+        '#markup' => '<h3>Заполните учётные данные.</h3>',
         '#weight'        => -1,
       );
       $form['account']['pass'] = array(
@@ -1031,12 +1031,12 @@ function startupspark_form_alter(&$form, &$form_state, $form_id) {
         require_once DRUPAL_ROOT . '/includes/locale.inc'; // Necessary for country_get_list().
         $select2 = array(
           '#type' => 'select',
-          '#title' => t('Выберите страну (Select2 example)'),
+          '#title' => 'Выберите страну (Select2 example)',
 
           // If returned values are identical to displayed values, you can use drupal_map_assoc()
           // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#options
           '#options' => drupal_map_assoc(country_get_list()),
-          '#empty_option' => t('Выберите страну'),
+          '#empty_option' => 'Выберите страну',
           // https://select2.github.io/select2/#documentation
           // https://select2.github.io/select2/#infinite
           '#select2' => array(

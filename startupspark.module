@@ -140,18 +140,19 @@ function startupspark_menu() {
     'title'            => 'Популярные',
     'menu_name'        => 'main-menu',
     'description'      => 'Ежедневно обновляемый список самых популярных стартапов.',
-    'page callback'    => 'startupspark_top_alltime_page',
+    'page callback'    => 'startupspark_top_page',
+    'page arguments'   => array(2, 3),
     'access callback'  => TRUE,
   );
   // Вкладка популярных за день
   $items['discover/top/daily'] = array(
     //'type'             => MENU_DEFAULT_LOCAL_TASK,
     'type'             => MENU_LOCAL_TASK,
-    'file'             => 'startupspark.forms.inc',
+    //'file'             => 'startupspark.forms.inc',
     'title'            => 'За день',
-    'weight'           => 4, // TODO: it is assumed to add `monthly` (Popular This Month, За месяц) tab
-    'page callback'    => 'drupal_get_form',
-    'page arguments'   => array('startupspark_placeholder_form'),
+    'weight'           => 4, // TODO: it is assumed to add `monthly` tab (Popular This Month, За месяц)
+    //'page callback'    => 'drupal_get_form',
+    //'page arguments'   => array('startupspark_placeholder_form'),
     //'access arguments' => array('access content'),
     'access callback'  => TRUE,
   );
@@ -165,7 +166,7 @@ function startupspark_menu() {
   $items['discover/top/alltime/all'] = array(
     'type'             => MENU_LOCAL_ACTION,
     'title'            => 'Показать все',
-    'page arguments'   => array(3),
+    //'page arguments'   => array(3),
     'access callback'  => TRUE,
   );
 
@@ -444,16 +445,11 @@ function custom_forms_category_update($form, &$form_state) {
     ->fields('s', array('name', 'logo', 'title', 'description', 'category', 'view_count'))
     ->condition('s.category', '%' . db_like($form_state['values']['keyword']) . '%', 'LIKE')
     ->orderBy('s.view_count', 'DESC')
-    ->execute();
+    ->execute()
+    ->fetchAllAssoc('name', PDO::FETCH_ASSOC);
 
-  $output = '';
-  $rows = 0;
-  foreach ($results as $row) {
-    $rows++;
-    $output .= theme('startupspark-list', array('content' => $row));
-  }
-
-  $output = '<h3>Найдено стартапов: ' . $rows . '</h3>' . $output;
+  $output = '<h3>Найдено стартапов: ' . sizeof($results) . '</h3>'
+    . theme('startupspark-list', array('content' => $results));
 
   $form['results'] = array(
     '#markup' => $output,
@@ -479,14 +475,11 @@ function custom_forms_count_update($form, &$form_state) {
     ->condition('s.staff_count', explode(',', $form_state['values']['rangefield']), 'BETWEEN')
     ->orderBy('s.staff_count', 'DESC')
     ->execute()
-    ->fetchAll();
+    ->fetchAllAssoc('name', PDO::FETCH_ASSOC);
 
   // TODO: use plural function
-  $output = '<h3>Найдено стартапов: ' . sizeof($results) . '</h3>';
-
-  foreach ($results as $row) {
-    $output .= theme('startupspark-list', array('content' => $row));
-  }
+  $output = '<h3>Найдено стартапов: ' . sizeof($results) . '</h3>'
+    . theme('startupspark-list', array('content' => $results));
 
   $form['results'] = array(
     '#markup' => $output,
@@ -875,14 +868,14 @@ function custom_forms_startup_exist($form, &$form_state) {
     ->condition('s.title', $form_state['values']['exist'])
     ->range(0, 1)
     ->execute()
-    ->fetchObject();
+    ->fetchAllAssoc('title', PDO::FETCH_ASSOC);
 
   if (empty($results)) {
     // TODO: need to test
     return FALSE;
   }
-  $output = '<h4>Краткая информация:</h4>';
-  $output .= theme('startupspark-list', array('content' => $results));
+  $output = '<h4>Краткая информация:</h4>'
+    . theme('startupspark-list', array('content' => $results));
 
   $form['results'] = array(
     '#markup' => $output,

@@ -85,32 +85,53 @@ function startupspark_project_page($startup, $action = NULL) {
  * @link http://drupalguide.ru/articles/database-api-drupal-7-vyborka-dannyh-i-ih-udalenie-dbselect-dbquery-i-dbdelete-chast-3 @endlink
  * @link http://knackforge.com/node/120 Creating pager in Drupal (without db_select() and PagerDefault) @endlink
  */
-function startupspark_top_alltime_page($arg = NULL) {
+function startupspark_top_page($range, $all = FALSE) {
+
+  if(empty($range)) {
+    $range = 'alltime';
+  }
 
   $per_page = 15;
+  $output = '';
 
-  // execute the query
-  $results = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup', 's')
-    ->extend('PagerDefault')
-    ->fields('s')
-    ->orderBy('s.view_count', 'DESC')
-    ->limit($per_page)
-    ->execute()
-    // If set to PDO::FETCH_ASSOC, PDO::FETCH_NUM, or PDO::FETCH_BOTH
-    // the returned value with be an array of arrays.
-    // For any other value it will be an array of objects.
-    // https://api.drupal.org/api/function/DatabaseStatementInterface::fetchAllAssoc/7
-    ->fetchAllAssoc('name', PDO::FETCH_ASSOC);
+  // TODO: need to split in the future
+  switch($range) {
+    case 'daily':
+      $output = '<em>Эта страница ещё не создана</em>';
+      break;
 
-  $output = theme('startupspark-discover', array('content' => $results));
+    /* some other intermediate ranges here */
 
-  if (NULL !== $arg) {
-    $page_level = pager_find_page() * $per_page;
-    $range = ($page_level + 1) . '-' . ($page_level + $per_page);
-    drupal_set_title(drupal_get_title() . ' #' . $range);
+    case 'alltime':
 
-    $output .= theme('pager');
+      // execute the query
+      $results = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup', 's')
+        ->extend('PagerDefault')
+        ->fields('s')
+        ->orderBy('s.view_count', 'DESC')
+        ->limit($per_page)
+        ->execute()
+        // If set to PDO::FETCH_ASSOC, PDO::FETCH_NUM, or PDO::FETCH_BOTH
+        // the returned value with be an array of arrays.
+        // For any other value it will be an array of objects.
+        // https://api.drupal.org/api/function/DatabaseStatementInterface::fetchAllAssoc/7
+        ->fetchAllAssoc('name', PDO::FETCH_ASSOC);
+
+      if(!empty($all)) {
+        $page_level = pager_find_page() * $per_page;
+        $text_range = ' #' . ($page_level + 1) . '-' . ($page_level + sizeof($results));
+        drupal_set_title(drupal_get_title() . $text_range);
+
+        $output = theme('startupspark-list', array('content' => $results));
+        $output .= theme('pager');
+      } else {
+        $output = theme('startupspark-discover', array('content' => $results));
+      }
+
+
+      break;
   }
+
   return $output;
 }
 

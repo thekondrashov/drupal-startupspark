@@ -7,6 +7,58 @@
 
 /**
  * Page callback.
+ *
+ * @link http://zroger.com/blog/ajax-modal-windows/ @endlink
+ */
+function user_menu_modal_callback($action, $js = FALSE) {
+
+  $form_name = '';
+  global $user;
+  $redirect = 'user/' . $user->uid . '/project';
+
+  switch ($action) {
+    case 'register':
+      $form_name = 'user_register_form';
+      $form_state = array('title' => 'Регистрация на сайте');
+      break;
+
+    case 'login':
+      $form_name = 'user_login';
+      $form_state = array('title' => 'Вход на сайт');
+
+      $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'staff', 'sf')
+        ->fields('sf', array('id_startup'))
+        ->condition('sf.id_user', $user->uid)
+        ->execute()
+        ->fetchField();
+
+      if(!empty($startup)) {
+        $redirect = 'projects/' . $startup;
+      }
+      break;
+  }
+
+  if ($js) {
+    ctools_include('ajax');
+    ctools_include('modal');
+    $form_state['ajax'] = TRUE;
+    $output = ctools_modal_form_wrapper($form_name, $form_state);
+
+    if (!empty($form_state['submitted'])) { // http://dgo.to/1850410
+      if (user_is_logged_in()) {
+        $output[] = ctools_modal_command_loading();
+        $output[] = ctools_ajax_command_redirect($redirect);
+      }
+    }
+
+    print ajax_render($output);
+  } else {
+    return drupal_get_form($form_name);
+  }
+}
+
+/**
+ * Page callback.
  */
 function startupspark_project_page($startup, $action = NULL) {
 

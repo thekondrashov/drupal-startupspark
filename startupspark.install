@@ -195,31 +195,19 @@ function startupspark_enable() {
   // How to programmatically set the front page?: https://drupal.stackexchange.com/a/1888
   variable_set('site_frontpage', 'discover/top');
 
-  $block = array(
-    'status' => 1,
-    'weight' => 20,
-    'region' => 'sidebar_first',
-    'visibility' => 0,
-    'pages' => "search/projects",
-    'module' => 'startupspark',
-    'delta' => 'startup_filter',
-    'theme' => 'bootstrap',
-    //'custom' => 1,
-  );
-
   db_merge('block')
     ->key(array(
-      'module'=>$block['module'],
-      'delta'=> $block['delta'],
-      'theme'=> $block['theme']
+      'delta'  => 'startup_filter',
+      'theme'  => 'bootstrap',
+      'module' => 'startupspark',
     ))
     ->fields(array(
-      'status' => $block['status'],
-      'weight' => $block['weight'],
-      'region' => $block['region'],
-      'visibility' => $block['visibility'],
-      'pages' => $block['pages'],
-      //'custom' => $block['custom'],
+      'status' => 1,
+      'weight' => 20,
+      'region' => 'sidebar_first',
+      'pages'  => 'search/projects',
+      'visibility' => 0,
+      //'custom' => 1,
     ))
     ->execute();
 

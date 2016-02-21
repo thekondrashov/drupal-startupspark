@@ -44,6 +44,9 @@ function startupspark_init() {
   ctools_include('modal');
   ctools_modal_add_js();
 
+  // drupal_add_css(), drupal_add_js() and drupal_add_library() removed in favor of #attached
+  // http://dgo.to/2169605
+
   if (theme_exists('bootstrap')) {
     drupal_add_css(
       STARTUPSPARK_ROOT . '/css/overrides-paper.css',
@@ -126,7 +129,6 @@ function startupspark_menu() {
    */
   // redirect to `discover/top`
   $items['discover'] = array(
-    'type'             => MENU_NORMAL_ITEM,
     'title'            => 'Стартапы',
     'description'      => 'Обзор стартапов.',
     'page callback'    => 'drupal_goto', // https://api.drupal.org/comment/60107#comment-60107
@@ -135,7 +137,6 @@ function startupspark_menu() {
   );
   // Список самых популярных стартапов.
   $items['discover/top'] = array(
-    'type'             => MENU_NORMAL_ITEM,
     'file'             => 'startupspark.pages.inc',
     'title'            => 'Популярные',
     'menu_name'        => 'main-menu',
@@ -177,7 +178,6 @@ function startupspark_menu() {
    */
   // Подробная информация о стартапе
   $items['projects/%startup'] = array(
-    'type'             => MENU_NORMAL_ITEM,
     'file'             => 'startupspark.pages.inc',
     'description'      => 'Страница с основной информацией о стартапе.',
     'page callback'    => 'startupspark_project_page',
@@ -229,26 +229,26 @@ function startupspark_menu() {
    * ----------------------------------------------------------------------
    */
   $items['user/register/%ctools_js'] = array(
-    'type'             => MENU_NORMAL_ITEM,
+    'file'             => 'startupspark.pages.inc',
     //'plid'             => 0,
     'title'            => 'Регистрация',
     'options'          => array('attributes' => array('class' => array('ctools-use-modal'))), // important line
     'menu_name'        => 'user-menu',
-    'description'      => 'Ежедневно обновляемый список самых популярных стартапов.',
-    'page callback'    => 'user_register_modal_callback',
-    'page arguments'   => array(2),
+    'description'      => 'Зарегистрироваться на сайте.',
+    'page callback'    => 'user_menu_modal_callback',
+    'page arguments'   => array(1, 2),
     // Hide a menu item for anonymous user: http://dgo.to/1421926#comment-8440561
     'access callback'  => 'user_is_anonymous',
   );
   $items['user/login/%ctools_js'] = array(
-    'type'             => MENU_NORMAL_ITEM,
+    'file'             => 'startupspark.pages.inc',
     'title'            => 'Вход',
     'weight'           => 1,
     'options'          => array('attributes' => array('class' => array('ctools-use-modal'))),
     'menu_name'        => 'user-menu',
-    'description'      => 'Вход на сайт.',
-    'page callback'    => 'user_login_modal_callback',
-    'page arguments'   => array(2),
+    'description'      => 'Войти на сайт.',
+    'page callback'    => 'user_menu_modal_callback',
+    'page arguments'   => array(1, 2),
     'access callback'  => 'user_is_anonymous',
   );
 
@@ -491,67 +491,6 @@ function custom_forms_count_update($form, &$form_state) {
   return array('#type' => 'ajax', '#commands' => $commands);
 }
 
-
-// http://zroger.com/blog/ajax-modal-windows/
-function user_register_modal_callback($js = FALSE) {
-  if ($js) {
-    ctools_include('ajax');
-    ctools_include('modal');
-    $form_state = array(
-      'ajax' => TRUE,
-      'title' => 'Регистрация на сайте',
-    );
-    $output = ctools_modal_form_wrapper('user_register_form', $form_state);
-
-    if (!empty($form_state['submitted'])) { // http://dgo.to/1850410
-      if (!user_is_anonymous()) {
-        global $user;
-        $output[] = ctools_modal_command_loading();
-        $output[] = ctools_ajax_command_redirect('user/' . $user->uid . '/project');
-      }
-    }
-    print ajax_render($output);
-  } else {
-    return drupal_get_form('user_register_form');
-  }
-}
-
-function user_login_modal_callback($js = FALSE) {
-  if ($js) {
-    ctools_include('ajax');
-    ctools_include('modal');
-    $form_state = array(
-      'ajax' => TRUE,
-      'title' => 'Вход на сайт',
-    );
-    $output = ctools_modal_form_wrapper('user_login', $form_state);
-
-    if (!empty($form_state['submitted'])) {
-      if (!user_is_anonymous()) {
-        $output[] = ctools_modal_command_loading();
-
-        global $user;
-
-        $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'staff', 'sf')
-          ->fields('sf', array('id_startup'))
-          ->condition('sf.id_user', $user->uid)
-          ->execute()
-          ->fetchField();
-
-        if(empty($startup)) {
-          $output[] = ctools_ajax_command_redirect('user/' . $user->uid . '/project');
-        } else {
-          $output[] = ctools_ajax_command_redirect('projects/' . $startup);
-        }
-      }
-    }
-    print ajax_render($output);
-  } else {
-    return drupal_get_form('user_login');
-  }
-}
-
-
 /**
  * Implements hook_block_info().
  *
@@ -559,9 +498,9 @@ function user_login_modal_callback($js = FALSE) {
  */
 function startupspark_block_info() {
   $blocks['startup_filter'] = array(
-    'info' => 'Filter of startups',
+    'info'   => 'Filter of startups',
     // https://api.drupal.org/api/drupal/includes!common.inc/group/block_caching/7
-    'cache' => DRUPAL_NO_CACHE,
+    'cache'  => DRUPAL_NO_CACHE,
     'status' => 1,
     'region' => 'sidebar_first',
   );
@@ -573,53 +512,31 @@ function startupspark_block_info() {
  * Implements hook_block_view().
  */
 function startupspark_block_view($delta = '') {
-  $block = array();
-
-  // http://drupal.reea.net/node/78
   switch ($delta) {
     case 'startup_filter':
 
-      $block['title'] = 'Filter';
+      $block['title'] = 'Фильтр';
 
+      // Prevent strict warning: "Only variables should be passed by reference".
+      // https://drupal.stackexchange.com/q/60411
       $form = drupal_get_form('form_search_projects_block');
 
       // Using this technique, you can encapsulate the js and css loading in your module_block_view
       // https://api.drupal.org/api/function/hook_block_info/7#comment-50868
       // https://api.drupal.org/api/function/drupal_add_css/7#comment-53463
       $block['content'] = array(
-        //'#markup' => theme(array('startupspark', 'startup_filter')),
         '#markup' => drupal_render($form),
         '#attached' => array('css' => array(STARTUPSPARK_ROOT . '/css/custom.css')),
       );
 
       return $block;
-      break;
-  }
-
-  return $block;
-}
-
-
-// Hiding a block based on code: https://drupal.stackexchange.com/a/31147
-// https://api.drupal.org/api/function/hook_block_list_alter/7
-function startupspark_block_list_alter(&$blocks) {
-
-  // https://api.drupal.org/api/function/request_path/7
-  if('search/projects' === request_path()) {
-    foreach ($blocks as $key => $block) {
-      if ('startup_filter' === $block->delta) {
-        unset($blocks[$key]);
-      }
-    }
   }
 }
-
 
 function startupspark_add_startup_form($form, &$form_state) {
 
-  // saving two lines of code: https://stackoverflow.com/q/8405386#comment35040665_8405715
-  $form['title']['#markup'] = '<h3>Участие в стартапе</h3>';
-  $form['message']['#markup'] = '<p><em>Можно одновременно учавствовать только в одном стартапе.</em></p>';
+  $form['title']['#markup'] =
+    '<h3>Участие в стартапе</h3><p><em>Можно одновременно участвовать только в одном стартапе.</em></p>';
 
   // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#fieldset
   $form['connect'] = array(
@@ -651,11 +568,8 @@ function startupspark_add_startup_form($form, &$form_state) {
     ),
   );
 
-  $form['connect']['results'] = array(
-    '#markup' => '',
-    '#prefix' => '<div id="container-results">',
-    '#suffix' => '</div>',
-  );
+  // saving two lines of code: https://stackoverflow.com/q/8405386#comment35040665_8405715
+  $form['connect']['results']['#markup'] = '<div id="container-results"></div>';
 
   $form['connect']['submit'] = array(
     '#type'       => 'submit',
@@ -777,17 +691,15 @@ function startupspark_connect_to_exist_form_submit($form, &$form_state) {
   } else {
     global $user;
 
-    // Merge queries using db_merge: http://dgo.to/310085
-    // db_merge function is very useful - it inserts data if they absent or updates it
-    // Insert a row in the db, or update the existing if it's already there.
-    // https://drupal.stackexchange.com/a/1350
+    // db_merge - Insert a row in the db, or update the existing if it's already there.
+    // http://dgo.to/310085, https://drupal.stackexchange.com/a/1350
     db_merge(STARTUPSPARK_SCHEMA_PREFIX . 'staff')
       ->insertFields(array(
         'id_user' => $user->uid,
-        'id_startup' => +$startup,
+        'id_startup' => $startup,
       ))
       ->updateFields(array(
-        'id_startup' => +$startup,
+        'id_startup' => $startup,
       ))
       ->key(array('id_user' => $user->uid))
       ->execute();
@@ -952,12 +864,10 @@ function startupspark_form_alter(&$form, &$form_state, $form_id) {
   switch ($form['#id']) {
 
     // User login form.
-    // user_login
     //case 'user-login':
     //  break;
 
     // User registration form.
-    // user_register_form
     case 'user-register-form':
     //case 'user-register-form--2': // TODO: choose way to prevent possible dublicates
       $form['account']['name']['#weight'] = 0;
@@ -987,12 +897,8 @@ function startupspark_form_alter(&$form, &$form_state, $form_id) {
         '#required'      => TRUE,
       );
       // Drupal 7 FAPI - Using form states for conditional field display: http://knackforge.com/node/77
-      // how to change value of submit button of comment form? http://drupal.stackexchange.com/a/40563
-      // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#states
+      // how to change value of submit button of comment form? https://drupal.stackexchange.com/a/40563
       $form['actions']['submit']['#states'] = array(
-        'disabled' => array(
-          ':input[name="terms_of_use"]' => array('checked' => FALSE),
-        ),
         'enabled' => array(
           ':input[name="terms_of_use"]' => array('checked' => TRUE),
         ),

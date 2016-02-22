@@ -14,7 +14,6 @@
  * @link http://habr.ru/p/200908 Drupal 7. Модуль подписок своими руками @endlink
  */
 
-
 /**
  * Implements hook_schema()
  *
@@ -24,6 +23,7 @@
 function startupspark_schema() {
 
   $prefix = 'startupspark_';
+  // To avoid problems, always use lower case for persistent variable names.
   variable_set('startupspark_schema_prefix', $prefix);
 
   // Startup table
@@ -155,7 +155,6 @@ function startupspark_schema() {
   return $schema;
 }
 
-
 /**
  * Implements hook_install().
  */
@@ -180,7 +179,6 @@ function startupspark_install() {
   */
 
 }
-
 
 /**
  * Implements hook_enable().
@@ -224,8 +222,6 @@ function startupspark_disable() {
   // Restore site's front page.
   variable_set('site_frontpage', variable_get('startupspark_backup_frontpage'));
 }
-
-
 
 /**
  * Implements hook_uninstall().

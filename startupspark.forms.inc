@@ -6,13 +6,6 @@
  */
 
 /**
- * Page placeholder.
- */
-function startupspark_placeholder_form($form, &$form_state) {
-  return array('placeholder' => array('#markup' => '<em>Эта страница ещё не создана</em>'));
-}
-
-/**
  * Form builder.
  *
  * @link http://dgo.to/854216 Textfield that uses autocomplete @endlink

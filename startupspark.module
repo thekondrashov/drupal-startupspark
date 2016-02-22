@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Файл .module - основное содержимое, функционал.
+ * Module file for startupspark module.
  *
  * @link http://azbukaweb.ru/node/192 Drupal 7: С чего начать @endlink
  * @link http://azbukaweb.ru/node/194 Вставка комментариев и реализация Вашего первого хука @endlink
@@ -76,9 +76,12 @@ function startupspark_init() {
  * Help text.
  *
  * @link https://api.drupal.org/api/function/hook_help @endlink
+ * @link http://dgo.to/632280 Help text standard (for core and contrib) @endlink
+ * @link http://dgo.to/604342 Guidelines for Drupal module to use when writing user interfaces text @endlink
+ * @link http://dgo.to/161085#hook_help Provide help text in the Drupal UI @endlink
+ * @link http://dgo.to/2181737 README Template @endlink
  * @link http://habr.ru/p/245117 @endlink
  * @link http://azbukaweb.ru/node/194 @endlink
- * @link http://dgo.to/632280 @endlink
  *
  * @param   string  $path
  *   The router menu path.
@@ -89,9 +92,33 @@ function startupspark_init() {
  */
 function startupspark_help($path, $arg) {
   switch ($path) {
+    // Help text for the admin section, using the module name in the path.
     case 'admin/help#startupspark':
-      return l(t('Source files'), 'https://git.io/vgTbC');
-      break;
+
+      // Return a line-break version of the module README.txt
+
+      // Multiple File Exists Checking? A Better way?: https://stackoverflow.com/a/4770273
+      $filepath = STARTUPSPARK_ROOT . '/README';
+      $list = array_filter(array("$filepath.md", "$filepath.txt"), 'file_exists');
+      if ($output = array_shift($list)) {
+        $output = file_get_contents($output);
+      } else {
+        return NULL;
+      }
+
+      if (module_exists('markdown')) {
+        $info = module_invoke('markdown', 'filter_info')['filter_markdown'];
+        if (function_exists($info['process callback'])) {
+          //return filter_xss_admin($info['process callback']($output, NULL));
+          return $info['process callback']($output, NULL);
+        }
+      }
+
+      return '<pre>' . check_plain($output) . '</pre>';
+
+    // Help for another path in the startupspark module.
+    //case 'admin/build/startupspark':
+    //  return '<p>' . t('') . '</p>';
   }
 }
 
@@ -131,7 +158,7 @@ function startupspark_menu() {
   $items['discover'] = array(
     'title'            => 'Стартапы',
     'description'      => 'Обзор стартапов.',
-    'page callback'    => 'drupal_goto', // https://api.drupal.org/comment/60107#comment-60107
+    'page callback'    => 'drupal_goto',
     'page arguments'   => array('discover/top'),
     'access callback'  => TRUE,
   );
@@ -145,18 +172,6 @@ function startupspark_menu() {
     'page arguments'   => array(2, 3),
     'access callback'  => TRUE,
   );
-  // Вкладка популярных за день
-  $items['discover/top/daily'] = array(
-    //'type'             => MENU_DEFAULT_LOCAL_TASK,
-    'type'             => MENU_LOCAL_TASK,
-    //'file'             => 'startupspark.forms.inc',
-    'title'            => 'За день',
-    'weight'           => 4, // TODO: it is assumed to add `monthly` tab (Popular This Month, За месяц)
-    //'page callback'    => 'drupal_get_form',
-    //'page arguments'   => array('startupspark_placeholder_form'),
-    //'access arguments' => array('access content'),
-    'access callback'  => TRUE,
-  );
   // Вкладка популярных за всё время
   $items['discover/top/alltime'] = array(
     'type'             => MENU_DEFAULT_LOCAL_TASK,
@@ -168,6 +183,15 @@ function startupspark_menu() {
     'type'             => MENU_LOCAL_ACTION,
     'title'            => 'Показать все',
     //'page arguments'   => array(3),
+    'access callback'  => TRUE,
+  );
+  // Вкладка популярных за день
+  $items['discover/top/daily'] = array(
+    'type'             => MENU_LOCAL_TASK,
+    'file'             => 'startupspark.pages.inc',
+    'title'            => 'За день',
+    'weight'           => 4, // TODO: it is assumed to add `monthly` tab (Popular This Month, За месяц)
+    'page callback'    => 'startupspark_placeholder_page',
     'access callback'  => TRUE,
   );
 

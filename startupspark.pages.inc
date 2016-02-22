@@ -6,6 +6,15 @@
  */
 
 /**
+ * Page placeholder.
+ *
+ * @link http://cgit.drupalcode.org/examples/tree/page_example/page_example.module @endlink
+ */
+function startupspark_placeholder_page() {
+  return array('#markup' => '<em>Эта страница ещё не создана</em>');
+}
+
+/**
  * Page callback.
  *
  * @link http://zroger.com/blog/ajax-modal-windows/ @endlink

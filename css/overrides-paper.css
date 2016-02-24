@@ -161,11 +161,11 @@ body #admin-menu .dropdown li {
   overflow: auto
 }
 
-.book-toc>.dropdown-menu,
+/*.book-toc>.dropdown-menu,
 .region-help .block,
 div.image-widget-data {
   overflow: hidden
-}
+}*/
 
 .modal-backdrop {
   z-index: 1610

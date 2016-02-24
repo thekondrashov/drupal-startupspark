@@ -17,7 +17,7 @@
     <div style="display:inline-block;padding:.25rem;width:100%;">
       <div class="thumbnail">
         <?php if (!empty($row['logo'])): ?>
-          <img src="<?php print $row['logo']; ?>" style="height:200px;width:100%" alt="100%x200">
+          <img src="<?php print image_style_url('medium', file_load($row['logo'])->uri); ?>" style="height:200px;width:100%" alt="100%x200">
         <?php else: ?>
           <img style="height:200px;width:100%" alt="100%x200" src="https://imgholder.ru/200x200">
         <?php endif; ?>

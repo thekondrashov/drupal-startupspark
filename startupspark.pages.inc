@@ -21,40 +21,45 @@ function startupspark_placeholder_page() {
  */
 function user_menu_modal_callback($action, $js = FALSE) {
 
-  $form_name = '';
-  global $user;
-  $redirect = 'user/' . $user->uid . '/project';
-
-  switch ($action) {
-    case 'register':
-      $form_name = 'user_register_form';
-      $form_state = array('title' => 'Регистрация на сайте');
-      break;
-
-    case 'login':
-      $form_name = 'user_login';
-      $form_state = array('title' => 'Вход на сайт');
-
-      $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'staff', 'sf')
-        ->fields('sf', array('id_startup'))
-        ->condition('sf.id_user', $user->uid)
-        ->execute()
-        ->fetchField();
-
-      if(!empty($startup)) {
-        $redirect = 'projects/' . $startup;
-      }
-      break;
-  }
+  $form_name = 'user_login';
 
   if ($js) {
     ctools_include('ajax');
     ctools_include('modal');
-    $form_state['ajax'] = TRUE;
+    $form_state = array('ajax' => TRUE);
+
+    switch ($action) {
+      case 'register':
+        $form_name = 'user_register_form';
+        $form_state['title'] = 'Регистрация на сайте';
+        break;
+
+      case 'login':
+        $form_name = 'user_login';
+        $form_state['title'] = 'Вход на сайт';
+        break;
+    }
+
     $output = ctools_modal_form_wrapper($form_name, $form_state);
 
     if (!empty($form_state['submitted'])) { // http://dgo.to/1850410
       if (user_is_logged_in()) {
+
+        global $user;
+        $redirect = 'user/' . $user->uid . '/project';
+
+        if ('login' === $action) {
+          $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'staff', 'sf')
+            ->fields('sf', array('id_startup'))
+            ->condition('sf.id_user', $user->uid)
+            ->execute()
+            ->fetchField();
+
+          if(!empty($startup)) {
+            $redirect = 'projects/' . $startup;
+          }
+        }
+
         $output[] = ctools_modal_command_loading();
         $output[] = ctools_ajax_command_redirect($redirect);
       }
@@ -135,7 +140,7 @@ function startupspark_project_page($startup, $action = NULL) {
     'startup' => $startup,
     'staff'   => $output,
   );
-  $output = theme('startupspark-overview', $variables);
+  $output = theme('startupspark_overview', $variables);
   return $output;
 }
 
@@ -183,10 +188,10 @@ function startupspark_top_page($range, $all = FALSE) {
         $text_range = ' #' . ($page_level + 1) . '-' . ($page_level + sizeof($results));
         drupal_set_title(drupal_get_title() . $text_range);
 
-        $output = theme('startupspark-list', array('content' => $results));
+        $output = theme('startupspark_list', array('content' => $results));
         $output .= theme('pager');
       } else {
-        $output = theme('startupspark-discover', array('content' => $results));
+        $output = theme('startupspark_discover', array('content' => $results));
       }
 
 

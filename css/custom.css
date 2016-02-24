@@ -34,3 +34,12 @@ body.navbar-is-fixed-top {
 .vertical-tabs-panes > fieldset {
   padding-left: 16px;
 }
+
+/*
+ * Fix file input.
+ */
+
+input[type="file"] {
+  display: inline-block;
+  width: auto;
+}

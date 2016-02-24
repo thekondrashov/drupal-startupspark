@@ -16,7 +16,7 @@
         <div class="media-left">
           <a href="#">
             <?php if (!empty($row['logo'])): ?>
-              <img src="<?php print $row['logo']; ?>" style="width:100px;height:100px;" alt="100x100">
+              <img src="<?php print image_style_url('thumbnail', file_load($row['logo'])->uri); ?>" style="width:100px;height:100px;" alt="100x100">
             <?php else: ?>
               <img style="height:100px;width:100px;" alt="100x100" src="https://imgholder.ru/100x100">
             <?php endif; ?>

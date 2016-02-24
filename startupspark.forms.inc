@@ -182,7 +182,7 @@ function startupspark_add_startup_form($form, &$form_state) {
         ':input[name="exist"]' => array('empty' => FALSE),
       ),
     ),
-    //'#validate'   => array('startupspark_connect_to_exist_form_validate'),
+    '#validate'   => array('startupspark_connect_to_exist_form_validate'),
     '#submit'     => array('startupspark_connect_to_exist_form_submit'),
   );
 
@@ -206,7 +206,7 @@ function startupspark_add_startup_form($form, &$form_state) {
   // Autocomplete field
   $form['new']['category'] = array(
     '#type'              => 'textfield',
-    '#size'              => 30,
+    '#size'              => 80,
     '#title'             => 'Род деятельности',
     '#attributes'        => array('placeholder' => array('Например, спорт')),
     '#description'       => 'Род деятельности / категория. Или выберете из списка уже имеющихся.',
@@ -214,23 +214,18 @@ function startupspark_add_startup_form($form, &$form_state) {
   );
 
   $form['new']['logo'] = array(
-    // https://drupal.stackexchange.com/a/25518
     '#type'               => 'managed_file',
-    '#title'              => t('Block image'),
-    '#progress_indicator' => 'throbber',
-    '#progress_message'   => 'Uploading ...',
+    '#title'              => t('Logo'),
+    '#theme'              => 'startupspark_thumb_upload',
+    //'#required'           => TRUE,
+    '#description'        => 'Допустимые форматы изображения: gif bmp png jpg jpeg',
     '#upload_location'    => 'public://startupspark/',
-    '#description'        => t('Allowed extensions: gif png jpg jpeg'),
     '#upload_validators'  => array(
-      'file_validate_extensions' => array('gif png jpg jpeg'),
-      // Pass the maximum file size in bytes
-      'file_validate_size' => array(1 * 1024 * 1024),
-      //'file_validate_size' => array(0.3*1024*1024),
-      // https://drupal.stackexchange.com/a/35001
-      'file_validate_image_resolution' => array('100x100'), // array('600x400','300x200'),
-      'file_validate_is_image' => array(), // Validates file is really an image.
+      'file_validate_size'             => array(variable_get('user_picture_file_size', 0.5) * 1024 * 1024),
+      'file_validate_is_image'         => array(),
+      'file_validate_extensions'       => array('gif bmp png jpg jpeg'),
+      'file_validate_image_resolution' => array(variable_get('user_picture_dimensions', '85x85')),
     ),
-    //'#default_value' => variable_get('logo', ''),
   );
   //$form['#attributes'] = array('enctype' => "multipart/form-data");
 
@@ -261,86 +256,54 @@ function startupspark_add_startup_form($form, &$form_state) {
 }
 
 // Проверка полей формы на ошибки ввода
+function startupspark_connect_to_exist_form_validate($form, &$form_state) {
+
+  if (mb_strlen($form_state['values']['exist']) < 3) {
+    form_set_error('exist', 'Слишком короткое название.');
+  } else {
+
+    // TODO: replace two db requests with single complex db request
+
+    $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup', 's')
+      ->fields('s', array('id'))
+      ->condition('s.title', $form_state['values']['exist'])
+      ->execute()
+      ->fetchField();
+
+    if(empty($startup)) {
+      form_set_error('exist', 'Стартап с таким названием не найден! Проверьте правильность введённого названия.');
+    } else {
+      global $user;
+
+      $num = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'staff', 'sf')
+        ->fields('sf')
+        ->condition('sf.id_startup', $startup)
+        ->condition('sf.id_user', $user->uid)
+        ->execute()
+        ->rowCount();
+
+      if ($num > 0) {
+        form_set_error('exist', 'Вы уже состоите в числе участников данного стартапа.');
+      }
+    }
+  }
+}
+
+// Проверка полей формы на ошибки ввода
 function startupspark_new_startup_form_validate($form, &$form_state) {
 
-  /*$startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup', 's')
-    ->fields('s', array('id'))
-    ->condition('s.title', $form_state['values']['title'])
-    ->execute()
-    ->fetchField();
-
-  if(!empty($startup)) {
-    form_set_error('title', 'Стартап с таким названием уже существует.');
-  }
-
-  if(mb_strlen($form_state['values']['title']) < 3) {
+  if (mb_strlen($form_state['values']['title']) < 3) {
     form_set_error('title', 'Слишком короткое название.');
-  }*/
-
-  //form_error($form, t('add_startup_form_validate'));
-
-
-  // File interface: https://api.drupal.org/api/drupal/includes%21file.inc/group/file/7
-  // File API: http://dgo.to/555118
-
-  // Никогда не удаляйте файлы, залитые с помощью Form API. Информация о файлах хранится в бд,
-  // с индексом по имени, поэтому при попытке загрузить файл под именем, который есть в бд,
-  // но которого нет на диске, получим fatal error.
-  // http://xandeadx.ru/blog/drupal/389
-
-  // http://rahulsingla.com/node/172#comment-1241
-  // https://api.drupal.org/api/function/user_validate_picture/7
-  // Save uploaded files.
-  // public file-system's path is 'sites/default/files'
-  $dir = file_build_uri('startupspark');
-  $is_writable = file_prepare_directory($dir, FILE_CREATE_DIRECTORY);
-
-  if ($is_writable) {
-    // Validate the uploaded picture.
-    $validators = array(
-      'file_validate_is_image' => array(),
-      //'file_validate_image_resolution' => array(variable_get('user_picture_dimensions', '85x85')),
-      //'file_validate_size' => array(variable_get('user_picture_file_size', 30) * 1024),
-      'file_validate_extensions' => array('gif png jpg jpeg'),
-    );
-
-    // http://rahulsingla.com/node/172
-    //$file = file_save_upload('document_filepath', array(), 'public://' . variable_get('document_path', ''), FILE_EXISTS_RENAME);
-    //$file = file_save_upload('file_form_field_name', array(), 'relative_path_to_files_folder');
-    //$file = file_save_upload('logo', $validators, 'public://startupspark/');
-    //$file = file_load($form_state['values']['logo']);
-
-    // TODO: file_save_upload(), как и move_uploaded_file() некорректно загружают файлы с русскими именами.
-    // Save the file as a temporary file.
-    if ($file = file_save_upload('logo', $validators, $dir, FILE_EXISTS_RENAME)) {
-
-      if (image_get_info($file->uri)) {
-        //$fid = $file->fid;
-        // Set the status of the uploaded file.
-        // file_set_status($file, FILE_STATUS_PERMANENT);
-        $file->status = FILE_STATUS_PERMANENT;
-        //$info = image_get_info($file->uri);
-        //global $user;
-        //$file->filename = 'avatar' . '-' . $user->uid . '-' . REQUEST_TIME . '.' . $info['extension'];
-        $file = file_save($file);
-        //drupal_set_message(file_create_url($file->uri) . ' ' . $dir . ' ' . $file->filename);
-        drupal_set_message('The file you have uploaded is: <pre>'.print_r($file, TRUE).'</pre>');
-        //drupal_set_message(t('New image saved.'));
-
-        // http://xandeadx.ru/blog/drupal/353
-        //$form_state['values']['file'] = $file; // передаём информацию о файле в ф-ю mymodule_form_submit()
-      } else {
-        file_delete($file->uri);
-        drupal_set_message(t('Uploaded file does not appear to be a valid image file. Please try again.'), 'warning');
-        return $form;
-      }
-    } else {
-      form_set_error('logo', 'Не удалось загрузить логотип. Пожалуйста, попробуйте ещё раз.');
-      return $form;
-    }
   } else {
-    form_set_error('logo', t('Directory not writable: !dir', array('!dir' => $dir)));
-    return $form;
+    $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup', 's')
+      ->fields('s', array('id'))
+      ->condition('s.title', $form_state['values']['title'])
+      ->execute()
+      ->fetchField();
+
+    if (!empty($startup)) {
+      form_set_error('title', 'Стартап с таким названием уже существует.');
+    }
   }
 }
 
@@ -370,6 +333,15 @@ function startupspark_connect_to_exist_form_submit($form, &$form_state) {
       ->key(array('id_user' => $user->uid))
       ->execute();
 
+    $num_updated = db_update(STARTUPSPARK_SCHEMA_PREFIX . 'startup')
+      ->expression('staff_count', 'staff_count + 1')
+      ->condition('id', $startup)
+      ->execute();
+
+    if(empty($num_updated)) {
+      drupal_set_message('Ошибка добавления в список участников стартапа.', 'error');
+    }
+
     drupal_set_message('Настройки успешно обновлены.');
     drupal_goto('projects/' . $startup);
   }
@@ -386,26 +358,35 @@ function startupspark_connect_to_exist_form_submit($form, &$form_state) {
  */
 function startupspark_add_startup_form_submit($form, &$form_state) {
 
+  $values = $form_state['values'];
+
   // The managed file element handles moving the uploaded file for you,
   // so there's no need to call `file_save_upload()` manually.
   // https://stackoverflow.com/a/18807226
-  $file = file_load($form_state['values']['logo']);
+
+  // Load the file via file.fid.
+  $file = file_load($values['logo']);
   // Важно помнить, что ф-я file_save_upload() загружает файл и помечает его как "Временный",
   // поэтому в submit-е формы нужно всегда изменять статус файла на "Постоянный"
   // (FILE_STATUS_PERMANENT) и вызывать file_save().
   // http://xandeadx.ru/blog/drupal/353
+  // Change status to permanent.
   $file->status = FILE_STATUS_PERMANENT;
-  $file = file_save($file);
+  $file = file_save($file); // Save.
+  // Record that the module is using the file.
+  // (Without the call to file_usage_add, file_managed_file_validate produces an error
+  // upon saving the form, saying that the uploaded file may not be referenced.)
+  file_usage_add($file, 'startupspark', 'user', 1); // attach the file to user 1: https://drupal.stackexchange.com/a/64492
 
   $startup = db_insert(STARTUPSPARK_SCHEMA_PREFIX . 'startup')
     ->fields(array(
-      'name' => sanitize($form_state['values']['title']),
-      'logo' => file_create_url($file->uri), // TODO: need to check when empty
-      'title' => $form_state['values']['title'],
-      'contact' => $form_state['values']['contact'],
-      'category' => $form_state['values']['category'],
-      'description' => $form_state['values']['description'],
-      'funder' => $form_state['values']['funder'],
+      'name'        => sanitize($values['title']),
+      'logo'        => $file->fid, //file_create_url($file->uri), // TODO: need to check when empty
+      'title'       => $values['title'],
+      'funder'      => $values['funder'],
+      'contact'     => $values['contact'],
+      'category'    => $values['category'],
+      'description' => $values['description'],
       'staff_count' => 1,
     ))
     ->execute();
@@ -454,7 +435,7 @@ function custom_forms_startup_exist($form, &$form_state) {
     return FALSE;
   }
   $output = '<h4>Краткая информация:</h4>'
-    . theme('startupspark-list', array('content' => $results));
+    . theme('startupspark_list', array('content' => $results));
 
   $form['results'] = array(
     '#markup' => $output,
@@ -484,7 +465,7 @@ function custom_forms_category_update($form, &$form_state) {
     ->fetchAllAssoc('name', PDO::FETCH_ASSOC);
 
   $output = '<h3>Найдено стартапов: ' . sizeof($results) . '</h3>'
-    . theme('startupspark-list', array('content' => $results));
+    . theme('startupspark_list', array('content' => $results));
 
   $form['results'] = array(
     '#markup' => $output,
@@ -514,7 +495,7 @@ function custom_forms_count_update($form, &$form_state) {
 
   // TODO: use plural function
   $output = '<h3>Найдено стартапов: ' . sizeof($results) . '</h3>'
-    . theme('startupspark-list', array('content' => $results));
+    . theme('startupspark_list', array('content' => $results));
 
   $form['results'] = array(
     '#markup' => $output,
@@ -524,4 +505,192 @@ function custom_forms_count_update($form, &$form_state) {
 
   $commands[] = ajax_command_replace('#container-results', drupal_render($form['results']));
   return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+function startupspark_edit_startup_form($form, &$form_state, $startup = NULL) {
+
+  drupal_set_title('');
+
+  $form['header']['#markup'] = '<h3>Редактирование информации о стартапе</h3>';
+
+  $form['startup_id'] = array(
+    '#type'   => 'hidden',
+    '#value'  => $startup->id,
+  );
+  $form['original_title'] = array(
+    '#type'   => 'hidden',
+    '#value'  => $startup->title,
+  );
+
+  $form['edit'] = array(
+    '#type'   => 'fieldset',
+    '#title'  => t('Edit'),
+  );
+
+  $form['edit']['title'] = array(
+    '#type'          => 'textfield',
+    '#title'         => t('Name'),
+    '#required'      => TRUE,
+    '#attributes'    => array('placeholder' => array('Например, Работающий вечный двигатель')),
+    '#maxlength'     => 80,
+    '#default_value' => $startup->title,
+    '#suffix' =>
+      '<span id="edit-title" class="help-block"><span class="text-warning">' . 'Не изменяйте без необходимости! Изменение названия повлечёт изменение текущей ссылки на домашнюю страницу стартапа, а прежняя ссылка станет нерабочей (за исключением короткой ссылки вида "/projects/{id}", которая не зависит от названия).' . '</span></span>',
+  );
+  $form['edit']['description'] = array(
+    '#type'          => 'textarea',
+    '#title'         => t('Description'),
+    '#required'      => TRUE,
+    '#maxlength'     => 512,
+    '#attributes'    => array('placeholder' => array('Миссия проекта, цели и т.д.')),
+    '#default_value' => $startup->description,
+  );
+  // Autocomplete field
+  $form['edit']['category'] = array(
+    '#type'              => 'textfield',
+    '#size'              => 30,
+    '#title'             => 'Род деятельности',
+    '#required'          => TRUE,
+    '#maxlength'         => 80,
+    '#attributes'        => array('placeholder' => array('Например, спорт')),
+    '#description'       => 'Род деятельности / категория. Или выберете из списка уже имеющихся.',
+    '#default_value'     => $startup->category,
+    '#autocomplete_path' => 'search/projects/autocomplete/category',
+  );
+
+  $form['edit']['logo'] = array(
+    // `managed_file` element type handles most of image upload logic for you:
+    // https://drupal.stackexchange.com/a/25518
+    '#type'               => 'managed_file',
+    '#title'              => t('Logo'),
+    // assign #theme directly to the managed_file in other case it won't be
+    // rebuilt after file upload: http://dgo.to/1673514/6696338
+    '#theme'              => 'startupspark_thumb_upload',
+    '#required'           => TRUE,
+    '#description'        => 'Допустимые форматы изображения: gif bmp png jpg jpeg', // TODO: need also `svg`
+    '#default_value'      => $startup->logo,
+    //'#default_value'      => 2,
+    '#upload_location'    => 'public://startupspark/',
+    // Validate the uploaded picture.
+    '#upload_validators'  => array(
+      // Maximum file size in bytes.
+      'file_validate_size'             => array(variable_get('user_picture_file_size', 0.5) * 1024 * 1024),
+      // Validates file is really an image.
+      'file_validate_is_image'         => array(),
+      // Allowed extensions.
+      'file_validate_extensions'       => array('gif bmp png jpg jpeg'),
+      // https://drupal.stackexchange.com/a/35001
+      'file_validate_image_resolution' => array(variable_get('user_picture_dimensions', '85x85')),
+    ),
+    // https://toster.ru/q/285260
+    //'#attributes' => array(
+    //  'multiple' => 'multiple',
+    //),
+  );
+
+  $form['edit']['funder'] = array(
+    '#type'          => 'textarea',
+    '#title'         => 'Инвесторы',
+    '#prefix'        => '<hr>',
+    '#required'      => TRUE,
+    '#maxlength'     => 512,
+    '#description'   => 'Список инвесторов проекта.',
+    '#default_value' => $startup->funder,
+  );
+  $form['edit']['contact'] = array(
+    '#type'          => 'textarea',
+    '#title'         => 'Контактные данные',
+    '#maxlength'     => 512,
+    '#required'      => TRUE,
+    '#default_value' => $startup->contact,
+  );
+
+  $form['edit']['submit'] = array(
+    '#type'   => 'submit',
+    '#value'  => t('Save'),
+    '#states' => array(
+      'enabled' => array(
+        ':input[name="title"]'       => array('empty' => FALSE),
+        ':input[name="funder"]'      => array('empty' => FALSE),
+        ':input[name="contact"]'     => array('empty' => FALSE),
+        ':input[name="category"]'    => array('empty' => FALSE),
+        ':input[name="description"]' => array('empty' => FALSE),
+      ),
+    ),
+  );
+
+  return $form;
+}
+
+// Проверка полей формы на ошибки ввода
+function startupspark_edit_startup_form_validate($form, &$form_state) {
+
+  if(mb_strlen($form_state['values']['title']) < 3) {
+    form_set_error('title', 'Слишком короткое название.');
+  } else {
+
+    if($form_state['values']['title'] !== $form_state['values']['original_title']) {
+      $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup', 's')
+        ->fields('s', array('id'))
+        ->condition('s.title', $form_state['values']['title'])
+        ->execute()
+        ->fetchField();
+
+      if(!empty($startup)) {
+        form_set_error('title', 'Стартап с таким названием уже существует.');
+      }
+    }
+  }
+
+  //form_error($form, t(''));
+  //drupal_set_message('The file you have uploaded is: <pre>'.print_r($file, TRUE).'</pre>');
+
+}
+
+function startupspark_edit_startup_form_submit($form, &$form_state) {
+
+  $values = $form_state['values'];
+
+  if(!empty($values['logo'])) {
+    // Загружаем файл (его объект)
+    $file = file_load($values['logo']);
+    // Сохраняем файл, если ему присвоен статус "временно".
+    if (1 != $file->status) {
+      // Статус (0 - временный, 1 - постоянный)
+      $file->status = FILE_STATUS_PERMANENT;
+      $file = file_save($file);
+    }
+    // Ошибка: 'Используемый в поле attach image файл не может быть использован': http://tsjee.ru/blog/68
+    // Прибавляем единичку использования
+    /**
+     * $file - Объект файла
+     * второй аргумент - название модуля
+     * третий - тип сущности, node и т.д.
+     * четвертый - идентификатор
+     */
+    file_usage_add($file, 'startupspark', 'startup', $values['startup_id']);
+    //file_usage_add($file, 'startupspark', 'user', $file->uid);
+    //file_usage_add($file, 'core', 'theme', $fid);
+  }
+
+  $num_updated = db_update(STARTUPSPARK_SCHEMA_PREFIX . 'startup')
+    ->fields(array(
+      'name'        => sanitize($form_state['values']['title']),
+      'logo'        => $file->fid, //file_create_url($file->uri), // TODO: need to check when empty
+      'title'       => $values['title'],
+      'funder'      => $values['funder'],
+      'contact'     => $values['contact'],
+      'category'    => $values['category'],
+      'description' => $values['description'],
+      //'staff_count' => 1,
+    ))
+    ->condition('id', $values['startup_id'])
+    ->execute();
+
+  if(empty($num_updated)) {
+    drupal_set_message('Информация о стартапе осталась без изменений.', 'warning');
+  } else {
+    drupal_set_message('Стартап успешно отредактирован.');
+    drupal_goto('projects/' . $values['startup_id']);
+  }
 }

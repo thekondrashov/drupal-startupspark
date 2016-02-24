@@ -109,8 +109,7 @@ function startupspark_help($path, $arg) {
       if (module_exists('markdown')) {
         $info = module_invoke('markdown', 'filter_info')['filter_markdown'];
         if (function_exists($info['process callback'])) {
-          //return filter_xss_admin($info['process callback']($output, NULL));
-          return $info['process callback']($output, NULL);
+          return filter_xss_admin($info['process callback']($output, NULL));
         }
       }
 
@@ -125,11 +124,10 @@ function startupspark_help($path, $arg) {
 /**
  * Implements hook_menu().
  *
- * Автоматическое создание пунктов меню, табов.
- *
  * @link https://api.drupal.org/api/function/hook_menu/7 @endlink
  * @link https://api.drupal.org/api/function/user_menu/7 @endlink
  * @link https://api.drupal.org/api/function/menu_example_menu/7 @endlink
+ * @link http://dgo.to/132202 Permissions reference @endlink
  */
 function startupspark_menu() {
   $items = array();
@@ -203,9 +201,12 @@ function startupspark_menu() {
   // Подробная информация о стартапе
   $items['projects/%startup'] = array(
     'file'             => 'startupspark.pages.inc',
+    'title'            => 'Обзор',
     'description'      => 'Страница с основной информацией о стартапе.',
     'page callback'    => 'startupspark_project_page',
     'page arguments'   => array(1, 2),
+    'title callback'   => 'startup_title_callback',
+    'title arguments'  => array(1),
     'access callback'  => TRUE,
   );
   // Вкладка с обзором информации о стартапе
@@ -214,11 +215,15 @@ function startupspark_menu() {
     'title'            => 'Обзор',
   );
   // Вкладка редактирования информации о стартапе
-  // TODO: need to be implemented!
   $items['projects/%startup/edit'] = array(
     'type'             => MENU_LOCAL_TASK,
+    'file'             => 'startupspark.forms.inc',
     'title'            => 'Редактирование',
-    'access arguments' => array('access custom user tab'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('startupspark_edit_startup_form', 1),
+    'access callback' => 'user_startup_edit_access',
+    //'access arguments' => array('access custom user tab'),
+    'access arguments' => array(1),
   );
   // Вкладка удаления стартапа
   // TODO: need to be implemented!
@@ -261,7 +266,7 @@ function startupspark_menu() {
     'description'      => 'Зарегистрироваться на сайте.',
     'page callback'    => 'user_menu_modal_callback',
     'page arguments'   => array(1, 2),
-    // Hide a menu item for anonymous user: http://dgo.to/1421926#comment-8440561
+    // Hide a menu item for anonymous user: http://dgo.to/1421926/8440561
     'access callback'  => 'user_is_anonymous',
   );
   $items['user/login/%ctools_js'] = array(
@@ -660,38 +665,112 @@ function startupspark_form_alter(&$form, &$form_state, $form_id) {
  *
  * @link https://stackoverflow.com/a/8258798 @endlink
  * @link https://github.com/aramboyajyan/drupal7-boilerplate/blob/master/boilerplate.module#L415 @endlink
+ * @link http://writeyourcode.com?p=332 @endlink
  */
 function startupspark_theme($existing, $type, $theme, $path) {
-  // Define theme dir.
-  $theme_dir   = STARTUPSPARK_ROOT . '/theme';
+  $base = array(
+    // path to your template file
+    'path' => STARTUPSPARK_ROOT . '/theme', // Define theme dir.
+  );
 
   // Themable elements. Theme keys.
   return array(
-    'startupspark-overview' => array(
-      // path to your template file
-      'path'      => $theme_dir,
+    'startupspark_overview' => $base + array(
       // your template filename
-      'template'  => 'overview', // do not include .tpl.php
+      'template'  => 'overview', // leave off .tpl.php
       'variables' => array(
         'startup' => NULL,
         'staff'   => NULL,
       ),
     ),
-    'startupspark-discover' => array(
-      'path'      => $theme_dir,
+    'startupspark_discover' => $base + array(
       'template'  => 'discover',
       'variables' => array(
         'title'   => NULL,
         'content' => NULL
       ),
     ),
-    'startupspark-list' => array(
-      'path'      => $theme_dir,
+    'startupspark_list' => $base + array(
       'template'  => 'list',
       'variables' => array(
         'title'   => NULL,
         'content' => NULL
       ),
     ),
+    // Display uploaded image
+    'startupspark_thumb_upload' => array(
+      //'file'           => 'startupspark.module',
+      'render element' => 'element',
+      // https://drupal.stackexchange.com/a/106363
+      //'variables' => array(
+      //  'style_name' => NULL,
+      //  'path' => NULL,
+      //  'width' => NULL,
+      //  'height' => NULL,
+      //  'alt' => '',
+      //  'title' => NULL,
+      //  'attributes' => array(),
+      //),
+    )
   );
+}
+
+/**
+ * Implements startupspark_thumb_upload theme callback.
+ * Returns HTML for a managed file element with thumbnail.
+ *
+ * @link https://stackoverflow.com/a/31849073 @endlink
+ * @link https://stackoverflow.com/a/32993171 @endlink
+ */
+function theme_startupspark_thumb_upload($variables) {
+
+  // Hide/remove a upload/remove button from managed_file upload field:
+  // http://writeyourcode.com?p=330
+  //unset($variables['element']['upload_button'], $variables['element']['remove_button']);
+
+  // To hide the upload button: https://drupal.stackexchange.com/a/32359
+  //$element['upload_button']['#access'] = FALSE;
+
+  $element = $variables['element'];
+  $attributes = array();
+  if (isset($element['#id'])) {
+    $attributes['id'] = $element['#id'];
+  }
+  if (!empty($element['#attributes']['class'])) {
+    $attributes['class'] = (array) $element['#attributes']['class'];
+  }
+  $attributes['class'][] = 'form-managed-file';
+  $attributes['class'][] = 'media';
+  $output = '';
+  $output .= '<div' . drupal_attributes($attributes) . '>';
+  if (isset($element['#file']->uri)) {
+    $output .= '<div class="media-left">';
+    $output .= '<img class="media-object img-thumbnail" src="' . image_style_url('thumbnail', $element['#file']->uri) . '" />';
+    $output .= '</div>';
+    $element['filename']['#markup'] .= ' <span class="file-size">(' . format_size($element['#file']->filesize) . ')</span> ';
+    $element['filename']['#markup'] = '<div class="media-heading">' . $element['filename']['#markup'] . '</div>';
+  }
+  $output .= '<div class="image-widget-data media-body">';
+  $output .= drupal_render_children($element);
+  $output .= '</div>';
+  $output .= '</div>';
+  return $output;
+}
+
+function startup_title_callback($arg = NULL) {
+  return t(empty($arg->title) ? drupal_get_title() : $arg->title);
+  //return NULL;
+}
+
+function user_startup_edit_access($startup = NULL) {
+  global $user;
+
+  $num = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'staff', 'sf')
+    ->fields('sf')
+    ->condition('sf.id_startup', $startup->id)
+    ->condition('sf.id_user', $user->uid)
+    ->execute()
+    ->rowCount();
+
+  return $num > 0;
 }

@@ -67,7 +67,7 @@ function startupspark_schema() {
       ),
       'category'    => array(
         'type'         => 'varchar',
-        'length'       => 255,
+        'length'       => 80,
         'default'      => '',
         'description'  => 'Category.'
       ),
@@ -182,8 +182,6 @@ function startupspark_install() {
 
 /**
  * Implements hook_enable().
- *
- * @link https://drupal.stackexchange.com/a/174451 @endlink
  */
 function startupspark_enable() {
 
@@ -193,6 +191,7 @@ function startupspark_enable() {
   // How to programmatically set the front page?: https://drupal.stackexchange.com/a/1888
   variable_set('site_frontpage', 'discover/top');
 
+  // How to enable block programmatically: https://drupal.stackexchange.com/a/174451
   db_merge('block')
     ->key(array(
       'delta'  => 'startup_filter',
@@ -203,8 +202,11 @@ function startupspark_enable() {
       'status' => 1,
       'weight' => 20,
       'region' => 'sidebar_first',
-      'pages'  => 'search/projects',
-      'visibility' => 0,
+      //'pages' => "instruments/*",
+      //'pages' => "instruments/*\n<front>",
+      //'pages'  => 'search/projects',
+      'pages'  => '<front>',
+      'visibility' => 1,
       //'custom' => 1,
     ))
     ->execute();

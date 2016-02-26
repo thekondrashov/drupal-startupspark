@@ -2,8 +2,119 @@
 
 /**
  * @file
- * Custom forms used in the module.
+ * Non admin custom forms and their handlers used in the module.
  */
+
+/**
+ * Implements hook_form_alter().
+ *
+ * Сurrently Drupal runs hook_form_alter AFTER hook_form_FORM_ID_alter.
+ * Some say it is safest to use hook_form_alter and a switch statement.
+ * https://stackoverflow.com/q/2264301#comment2351220_2302029
+ *
+ * @link https://github.com/aramboyajyan/drupal7-boilerplate @endlink
+ * @link https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7 @endlink
+ */
+function startupspark_form_alter(&$form, &$form_state, $form_id) {
+
+  /**
+   * General overrides.
+   */
+  switch ($form['#id']) {
+
+    // User login form.
+    //case 'user-login':
+    //  break;
+
+    // User registration form.
+    case 'user-register-form':
+      //case 'user-register-form--2': // TODO: choose way to prevent possible dublicates
+      $form['account']['name']['#weight'] = 0;
+
+      // TODO: need to delete from release
+      form_set_error('mail', 'В данный момент в azure пока не настроена оправка e-mail.');
+      unset($form['account']['mail']['#description']);
+
+      $form['account']['label_main'] = array(
+        '#markup' => '<h3>Заполните учётные данные.</h3>',
+        '#weight'        => -1,
+      );
+      $form['account']['pass'] = array(
+        '#type'          => 'password_confirm',
+        '#required'      => TRUE,
+        // We need to remove the label to get a nice version: https://wp.me/p3PJLY-gP
+        '#title_display' => 'invisible',
+      );
+
+      // Add a checkbox to registration form about agreeing to terms of use.
+      // https://api.drupal.org/api/function/hook_form_FORM_ID_alter/7
+      $form['account']['terms_of_use'] = array(
+        '#type'          => 'checkbox',
+        // I agree with the website's terms and conditions.
+        //t('I certify that I am over the age of 18 years old.'),
+        '#title'         => 'Я подтверждаю, что мне больше 18 лет.',
+        '#required'      => TRUE,
+      );
+      // Drupal 7 FAPI - Using form states for conditional field display: http://knackforge.com/node/77
+      // how to change value of submit button of comment form? https://drupal.stackexchange.com/a/40563
+      $form['actions']['submit']['#states'] = array(
+        'enabled' => array(
+          ':input[name="terms_of_use"]' => array('checked' => TRUE),
+        ),
+      );
+      $form['actions']['submit']['#attributes'] = array('class' => array('btn-primary'));
+
+      break;
+  }
+
+  /**
+   * Specific overrides.
+   */
+  switch ($form_id) {
+
+    // Add missing bootstrap classes and role to search form.
+    // Темизация элементов формы поиска в Dpupal 7: http://master-web.info?p=3733
+    // TODO: you should change access to search box on `admin/people/permissions` page for non-admin users
+    // Search block not visible: http://dgo.to/1092502
+    case 'search_block_form':
+
+      $form['search_block_form']['#title_display'] = 'invisible'; // Toggle label visibilty
+      $form['search_block_form']['#attributes']['class'][] = 'form-control';
+      if (module_exists('select2')) {
+        $form['search_block_form']['#attributes']['class'][] = 'hidden';
+      }
+      $form['#attributes']['class'] = array('navbar-form');
+
+      if (module_exists('select2')) {
+        require_once DRUPAL_ROOT . '/includes/locale.inc'; // Necessary for country_get_list().
+        $select2 = array(
+          '#type' => 'select',
+          '#title' => 'Выберите страну (Select2 example)',
+
+          // If returned values are identical to displayed values, you can use drupal_map_assoc()
+          // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#options
+          '#options' => drupal_map_assoc(country_get_list()),
+          '#empty_option' => 'Выберите страну',
+          // https://select2.github.io/select2/#documentation
+          // https://select2.github.io/select2/#infinite
+          '#select2' => array(
+            'width'                => '100%',
+            'allowClear'           => FALSE, // display clear button
+            'placeholder'          => 'Введите название',
+            'dropdownCssClass'     => 'bigdrop', // apply css that makes the dropdown taller
+            'minimumInputLength'   => 1,
+            'maximumInputLength'   => 10,
+            'maximumSelectionSize' => 3,
+          ),
+        );
+
+        // https://php.net/array-merge
+        $form['search_block_form'] = array_merge($form['search_block_form'], $select2);
+      }
+
+      break;
+  }
+}
 
 /**
  * Form builder.
@@ -221,6 +332,7 @@ function startupspark_add_startup_form($form, &$form_state) {
     '#description'        => 'Допустимые форматы изображения: gif bmp png jpg jpeg',
     '#upload_location'    => 'public://startupspark/',
     '#upload_validators'  => array(
+      //'file_validate_size'             => array(variable_get('user_picture_file_size', file_upload_max_size())),
       'file_validate_size'             => array(variable_get('user_picture_file_size', 0.5) * 1024 * 1024),
       'file_validate_is_image'         => array(),
       'file_validate_extensions'       => array('gif bmp png jpg jpeg'),
@@ -334,7 +446,8 @@ function startupspark_connect_to_exist_form_submit($form, &$form_state) {
       ->execute();
 
     $num_updated = db_update(STARTUPSPARK_SCHEMA_PREFIX . 'startup')
-      ->expression('staff_count', 'staff_count + 1')
+      // http://drupalbook.ru/node/246
+      ->expression('staff_count', 'staff_count + :inc', array(':inc' => 1))
       ->condition('id', $startup)
       ->execute();
 
@@ -370,7 +483,7 @@ function startupspark_add_startup_form_submit($form, &$form_state) {
   // поэтому в submit-е формы нужно всегда изменять статус файла на "Постоянный"
   // (FILE_STATUS_PERMANENT) и вызывать file_save().
   // http://xandeadx.ru/blog/drupal/353
-  // Change status to permanent.
+  // Change the file status to permanent so it is not deleted in next cron run
   $file->status = FILE_STATUS_PERMANENT;
   $file = file_save($file); // Save.
   // Record that the module is using the file.
@@ -586,6 +699,8 @@ function startupspark_edit_startup_form($form, &$form_state, $startup = NULL) {
     //'#attributes' => array(
     //  'multiple' => 'multiple',
     //),
+    // http://margotskapacs.com?p=3862
+    //'#process' => array('our_custom_callback'),
   );
 
   $form['edit']['funder'] = array(
@@ -605,9 +720,12 @@ function startupspark_edit_startup_form($form, &$form_state, $startup = NULL) {
     '#default_value' => $startup->contact,
   );
 
-  $form['edit']['submit'] = array(
+  $form['edit']['actions'] = array('#type' => 'actions');
+
+  $form['edit']['actions']['submit'] = array(
     '#type'   => 'submit',
     '#value'  => t('Save'),
+    '#weight' => 5,
     '#states' => array(
       'enabled' => array(
         ':input[name="title"]'       => array('empty' => FALSE),
@@ -619,7 +737,37 @@ function startupspark_edit_startup_form($form, &$form_state, $startup = NULL) {
     ),
   );
 
+  //$form['actions']['preview'] = array(
+  //  '#type' => 'submit',
+  //  '#value' => t('Preview'),
+  //  '#weight' => 10,
+  //  '#submit' => array('node_form_build_preview'),
+  //);
+
+  $form['edit']['actions']['cancel'] = array(
+    '#type'   => 'submit',
+    '#value'  => t('Cancel'),
+    '#weight' => 10,
+    // `#limit_validation_errors` contains an array of elements to validate on submit
+    // and since it is empty in this case nothing is validated
+    // In order for #limit_validation_errors to work you also need to specify
+    // a submit function to call otherwise the element attribute is ignored.
+    // http://jbisgaard.dk/node/32
+    // http://serho.ru/notes/form-api/limit-validation-errors
+    '#submit' => array('callback_for_cancel_button'),
+    '#limit_validation_errors' => array(),
+  );
+
   return $form;
+}
+
+// https://wp.me/p3qalz-2q
+function callback_for_cancel_button($form, &$form_state) {
+  // add reset button to forms: https://drupal.stackexchange.com/a/167328
+  //$form_state['rebuild'] = FALSE;
+
+  // redirect from `/projects/{startup}/edit` to `/projects/{startup}`
+  drupal_goto(implode('/', explode('/', rtrim(request_path(), '/'), -1)));
 }
 
 // Проверка полей формы на ошибки ввода
@@ -693,4 +841,112 @@ function startupspark_edit_startup_form_submit($form, &$form_state) {
     drupal_set_message('Стартап успешно отредактирован.');
     drupal_goto('projects/' . $values['startup_id']);
   }
+}
+
+function form_search_projects_block($form, &$form_state) {
+
+  $query = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup');
+  $query->addExpression('MIN(staff_count)');
+  $query->addExpression('MAX(staff_count)');
+
+  list($min, $max) = array_pad(array_values($query->execute()->fetchAssoc()), 2, 10);
+
+  $range = '[' . $min . ',' . $max . ']';
+
+  $form['fieldset1'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'По количеству участников',
+    //'#weight' => 5,
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#states' => array(
+      'collapsed' => array(
+        ':input[name="keyword"]' => array('empty' => FALSE),
+      ),
+    ),
+  );
+
+  $form['fieldset1']['rangefield'] = array(
+    //'#id' => 'rangefield',
+    '#type' => 'textfield',
+    '#prefix' => '<p class="control-label" for="rangefield">Диапазон:</p><br>',
+    '#default_value' => 1,
+    // https://github.com/seiyria/bootstrap-slider
+    '#attributes'    => array(
+      'data-slider-min'  => $min,
+      'data-slider-max'  => $max,
+      'data-slider-value'  => $range,
+      'data-slider-range'  => TRUE,
+      'data-slider-ticks'  => $range,
+      'data-slider-ticks-labels'  => '["От ' . $min . '", "До ' . $max . '"]',
+      'data-slider-tooltip-split' => TRUE,
+    ),
+    '#attached' => array(
+      'css' => array(
+        array(
+          'data'  => 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/6.0.16/css/bootstrap-slider.min.css',
+          'type'  => 'external',
+          'group' => CSS_THEME,
+        ),
+        array(
+          'data'  => '.slider-selection{background:#d099d9}.slider.slider-horizontal{width:90%;margin-left:10px}',
+          'type'  => 'inline',
+          'group' => CSS_THEME,
+        ),
+      ),
+      'js' => array(
+        array(
+          'data'  => 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/6.0.16/bootstrap-slider.min.js',
+          'type'  => 'external',
+          'scope' => 'header',
+        ),
+        array(
+          'data'  => STARTUPSPARK_ROOT . '/js/slider.js',
+          'scope' => 'footer',
+        ),
+      ),
+    ),
+  );
+
+  $form['fieldset1']['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => 'Найти',
+  );
+
+  $form['fieldset2'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'По роду деятельности',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  // Autocomplete field
+  $form['fieldset2']['keyword'] = array(
+    '#type'              => 'textfield',
+    '#size'              => 30,
+    '#title'             => 'Род деятельности',
+    '#attributes'        => array('placeholder' => array('Например, спорт')),
+    '#description'       => 'Введите ключевое слово.',
+    '#autocomplete_path' => 'search/projects/autocomplete/category',
+  );
+
+  $form['fieldset2']['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => 'Найти',
+  );
+
+  return $form;
+}
+
+/**
+ * Drupal form submit handler.
+ */
+function form_search_projects_block_submit($form, &$form_state) {
+
+  // TODO: creates problems on concurrent requests!
+  if(!empty($form_state['values']['keyword'])) {
+    cache_set('search-keyword', $form_state['values']['keyword'], 'cache');
+  }
+
+  drupal_goto('search/projects');
 }

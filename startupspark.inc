@@ -48,3 +48,27 @@ function sanitize($string, $force_lowercase = TRUE, $anal = FALSE) {
       strtolower($clean) :
     $clean;
 }
+
+/**
+ * Helper function - get redirect path on user login.
+ *
+ * @param integer $uid
+ *   The user's uid.
+ *
+ * @return string
+ */
+function get_redirect_path_on_login($uid = NULL) {
+  if(NULL === $uid) {
+    //global $user;
+    //$uid = $user->uid;
+    $uid = $GLOBALS['user']->uid;
+  }
+
+  $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'staff', 'sf')
+    ->fields('sf', array('id_startup'))
+    ->condition('sf.id_user', $uid)
+    ->execute()
+    ->fetchField();
+
+  return empty($startup) ? 'user/' . $uid . '/project' : 'projects/' . $startup;
+}

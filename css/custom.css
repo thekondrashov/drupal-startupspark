@@ -43,3 +43,13 @@ input[type="file"] {
   display: inline-block;
   width: auto;
 }
+
+/*
+ * Fix overriding CTools modal window when navbar is expanded on mobile devices.
+ */
+
+@media (max-width: 767px) {
+  .modal-undefined {
+    z-index: 1030 !important;
+  }
+}

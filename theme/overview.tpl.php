@@ -47,9 +47,7 @@
     </div>
     <div class="panel-collapse collapse in" role="tabpanel">
       <div class="panel-body">
-        <?php if (!empty($staff)): print $staff; else: ?>
-          <em class="text-muted">участники отсутствуют</em>
-        <?php endif; ?>
+        <?php if (!empty($staff)): print $staff; endif; ?>
       </div>
     </div>
   </div>

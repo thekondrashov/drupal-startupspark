@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Collection of module pages.
+ * Collection of module menu callbacks.
  */
 
 /**
@@ -12,6 +12,10 @@
  */
 function startupspark_placeholder_page() {
   return array('#markup' => '<em>Эта страница ещё не создана</em>');
+}
+
+function redirect_to_startup_page() {
+  drupal_goto(get_redirect_path_on_login());
 }
 
 /**
@@ -49,15 +53,7 @@ function user_menu_modal_callback($action, $js = FALSE) {
         $redirect = 'user/' . $user->uid . '/project';
 
         if ('login' === $action) {
-          $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'staff', 'sf')
-            ->fields('sf', array('id_startup'))
-            ->condition('sf.id_user', $user->uid)
-            ->execute()
-            ->fetchField();
-
-          if(!empty($startup)) {
-            $redirect = 'projects/' . $startup;
-          }
+          $redirect = get_redirect_path_on_login($user->uid);
         }
 
         $output[] = ctools_modal_command_loading();
@@ -104,7 +100,7 @@ function startupspark_project_page($startup, $action = NULL) {
 
   // Инкремент значения поля с количеством просмотров.
   db_update(STARTUPSPARK_SCHEMA_PREFIX . 'startup')
-    ->expression('view_count', 'view_count + 1')
+    ->expression('view_count', 'view_count + :inc', array(':inc' => 1))
     ->condition('id', $startup->id)
     ->execute();
 
@@ -132,8 +128,9 @@ function startupspark_project_page($startup, $action = NULL) {
   $header = array(
     'Имя пользователя',
   );
+  // https://wp.me/p3qalz-29
   $output = theme(
-    'table', array('header' => $header, 'rows' => $rows)
+    'table', array('header' => $header, 'rows' => $rows, 'empty' => 'Участники отсутствуют',)
   );
 
   $variables = array(

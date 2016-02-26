@@ -2,7 +2,16 @@
 
 /**
  * @file
- * Module file for startupspark module.
+ * Main file for the Startups park module.
+ * Contains the Drupal hook implementations.
+ *
+ * By convention .module files should contains only those functions
+ * which are implementation of hooks.
+ * Following this standard improves the performance too.
+ * https://drupal.stackexchange.com/a/54069
+ *
+ * Note: All the functions from .module files get loaded at every initialisation.
+ * https://stackoverflow.com/q/3520928#comment40619035_3521785
  *
  * @link http://azbukaweb.ru/node/192 Drupal 7: С чего начать @endlink
  * @link http://azbukaweb.ru/node/194 Вставка комментариев и реализация Вашего первого хука @endlink
@@ -19,13 +28,17 @@
 // Schema prefix.
 define('STARTUPSPARK_SCHEMA_PREFIX', variable_get('startupspark_schema_prefix'));
 // Get the path to this module.
+// you can use `drupal_get_path('module', 'mymodulename)` as a prefix
+// instead of `__DIR__` but I don't see anything wrong with either way.
+// https://drupal.stackexchange.com/q/77545#comment86407_77547
 define('STARTUPSPARK_ROOT', drupal_get_path('module', 'startupspark'));
 
 /**
  * Preload certain files whose functions we need at all times.
  */
-//require_once dirname(__FILE__) . '/startupspark.helpers.inc';
-require_once STARTUPSPARK_ROOT . '/startupspark.helpers.inc';
+require_once STARTUPSPARK_ROOT . '/startupspark.inc';
+// Move block functions into .inc file: https://drupal.stackexchange.com/a/77547
+//require_once STARTUPSPARK_ROOT . '/startupspark.blocks.inc';
 
 /**
  * Implements hook_init().
@@ -147,7 +160,6 @@ function startupspark_menu() {
     'access arguments' => array('administer site configuration'),
   );
 
-
   /**
    * Список самых популярных стартапов.
    * ----------------------------------------------------------------------
@@ -193,7 +205,6 @@ function startupspark_menu() {
     'access callback'  => TRUE,
   );
 
-
   /**
    * Страницы управления стартапом
    * ----------------------------------------------------------------------
@@ -201,7 +212,7 @@ function startupspark_menu() {
   // Подробная информация о стартапе
   $items['projects/%startup'] = array(
     'file'             => 'startupspark.pages.inc',
-    'title'            => 'Обзор',
+    'title'            => 'Overview',
     'description'      => 'Страница с основной информацией о стартапе.',
     'page callback'    => 'startupspark_project_page',
     'page arguments'   => array(1, 2),
@@ -212,51 +223,33 @@ function startupspark_menu() {
   // Вкладка с обзором информации о стартапе
   $items['projects/%startup/overview'] = array(
     'type'             => MENU_DEFAULT_LOCAL_TASK,
-    'title'            => 'Обзор',
+    'title'            => 'Overview',
   );
   // Вкладка редактирования информации о стартапе
   $items['projects/%startup/edit'] = array(
     'type'             => MENU_LOCAL_TASK,
     'file'             => 'startupspark.forms.inc',
-    'title'            => 'Редактирование',
+    'title'            => 'Edit',
+    'weight'           => 1,
     'page callback'    => 'drupal_get_form',
     'page arguments'   => array('startupspark_edit_startup_form', 1),
-    'access callback' => 'user_startup_edit_access',
-    //'access arguments' => array('access custom user tab'),
+    'access callback'  => 'user_startup_edit_access',
     'access arguments' => array(1),
   );
   // Вкладка удаления стартапа
   // TODO: need to be implemented!
   $items['projects/%startup/delete'] = array(
     'type'             => MENU_LOCAL_TASK,
-    'title'            => 'Удаление',
+    'title'            => 'Delete',
+    'weight'           => 2,
     'access arguments' => array('access custom user tab'),
   );
 
-
   /**
-   * Добавление информации о стартапе
+   * Ссылки в Меню пользователя, связанные с учетной записью текущего пользователя.
    * ----------------------------------------------------------------------
    */
-  // Страница добавления информации о стартапе, если у данного пользователя нет добавленных
-  $items['user/%/project'] = array(
-    'type'             => MENU_LOCAL_TASK,
-    'file'             => 'startupspark.forms.inc',
-    'title'            => 'Мой стартап',
-    //'weight'           => 100,
-    'page callback'    => 'drupal_get_form',
-    'page arguments'   => array('startupspark_add_startup_form', 1),
-    'access callback'  => 'user_is_logged_in', // https://drupal.stackexchange.com/a/51184
-    // https://drupal.stackexchange.com/a/95989
-    //'title callback' => 'user_page_title',
-    //'title arguments' => array(1),
-  );
-
-
-  /**
-   * Регистрация/аутентификация пользователя в модальных окнах
-   * ----------------------------------------------------------------------
-   */
+  // Регистрация пользователя в модальном окне.
   $items['user/register/%ctools_js'] = array(
     'file'             => 'startupspark.pages.inc',
     //'plid'             => 0,
@@ -269,6 +262,7 @@ function startupspark_menu() {
     // Hide a menu item for anonymous user: http://dgo.to/1421926/8440561
     'access callback'  => 'user_is_anonymous',
   );
+  // Аутентификация пользователя в модальном окне.
   $items['user/login/%ctools_js'] = array(
     'file'             => 'startupspark.pages.inc',
     'title'            => 'Вход',
@@ -280,7 +274,31 @@ function startupspark_menu() {
     'page arguments'   => array(1, 2),
     'access callback'  => 'user_is_anonymous',
   );
-
+  // Редирект на страницу своего стартапа или добавления стартапа, если не добавлен.
+  // "if the menu path contains %user, it doesn't work.": https://drupal.stackexchange.com/q/52941
+  $items['user/project'] = array(
+    'file'             => 'startupspark.pages.inc',
+    'title'            => 'Мой стартап',
+    'weight'           => -20,
+    'menu_name'        => 'user-menu',
+    'description'      => 'Стартап, в котором вы принимаете участие.',
+    'page callback'    => 'redirect_to_startup_page',
+    //'page arguments'   => array(),
+    'access callback'  => 'user_is_logged_in', // https://drupal.stackexchange.com/a/51184
+    // https://drupal.stackexchange.com/a/95989
+    //'title callback' => 'user_page_title',
+    //'title arguments' => array(1),
+  );
+  // Страница добавления информации о стартапе, если у данного пользователя нет добавленных.
+  $items['user/%user/project'] = array(
+    'type'             => MENU_LOCAL_TASK,
+    'file'             => 'startupspark.forms.inc',
+    'title'            => 'Мой стартап',
+    //'weight'           => 100,
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('startupspark_add_startup_form', 1),
+    'access callback'  => 'user_is_logged_in',
+  );
 
   /**
    * Страница поиска стартапов
@@ -320,6 +338,7 @@ function startupspark_menu_link_alter(&$item) {
   switch($item['link_path']) {
     case 'user/register/%':
     case 'user/login/%':
+    case 'user/project':
     //case 'discover/top':
 
       // Check if already created.
@@ -352,158 +371,50 @@ function startupspark_menu_link_alter(&$item) {
   }
 }
 
-function form_search_projects_block($form, &$form_state) {
-
-  $query = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup');
-  $query->addExpression('MIN(staff_count)');
-  $query->addExpression('MAX(staff_count)');
-
-  list($min, $max) = array_pad(array_values($query->execute()->fetchAssoc()), 2, 10);
-
-  $range = '[' . $min . ',' . $max . ']';
-
-  $form['fieldset1'] = array(
-    '#type' => 'fieldset',
-    '#title' => 'По количеству участников',
-    //'#weight' => 5,
-    '#collapsible' => TRUE,
-    '#collapsed' => FALSE,
-    '#states' => array(
-      'collapsed' => array(
-        ':input[name="keyword"]' => array('empty' => FALSE),
-      ),
-    ),
-  );
-
-  $form['fieldset1']['rangefield'] = array(
-    //'#id' => 'rangefield',
-    '#type' => 'textfield',
-    '#prefix' => '<p class="control-label" for="rangefield">Диапазон:</p><br>',
-    '#default_value' => 1,
-    // https://github.com/seiyria/bootstrap-slider
-    '#attributes'    => array(
-      'data-slider-min'  => $min,
-      'data-slider-max'  => $max,
-      'data-slider-value'  => $range,
-      'data-slider-range'  => TRUE,
-      'data-slider-ticks'  => $range,
-      'data-slider-ticks-labels'  => '["От ' . $min . '", "До ' . $max . '"]',
-      'data-slider-tooltip-split' => TRUE,
-    ),
-    '#attached' => array(
-      'css' => array(
-        array(
-          'data'  => 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/6.0.16/css/bootstrap-slider.min.css',
-          'type'  => 'external',
-          'group' => CSS_THEME,
-        ),
-        array(
-          'data'  => '.slider-selection{background:#d099d9}.slider.slider-horizontal{width:90%;margin-left:10px}',
-          'type'  => 'inline',
-          'group' => CSS_THEME,
-        ),
-      ),
-      'js' => array(
-        array(
-          'data'  => 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/6.0.16/bootstrap-slider.min.js',
-          'type'  => 'external',
-          'scope' => 'header',
-        ),
-        array(
-          'data'  => STARTUPSPARK_ROOT . '/js/slider.js',
-          'scope' => 'footer',
-        ),
-      ),
-    ),
-  );
-
-  $form['fieldset1']['submit'] = array(
-    '#type'  => 'submit',
-    '#value' => 'Найти',
-  );
-
-  $form['fieldset2'] = array(
-    '#type' => 'fieldset',
-    '#title' => 'По роду деятельности',
-    '#collapsible' => TRUE,
-    '#collapsed' => TRUE,
-  );
-
-  // Autocomplete field
-  $form['fieldset2']['keyword'] = array(
-    '#type'              => 'textfield',
-    '#size'              => 30,
-    '#title'             => 'Род деятельности',
-    '#attributes'        => array('placeholder' => array('Например, спорт')),
-    '#description'       => 'Введите ключевое слово.',
-    '#autocomplete_path' => 'search/projects/autocomplete/category',
-  );
-
-  $form['fieldset2']['submit'] = array(
-    '#type'  => 'submit',
-    '#value' => 'Найти',
-  );
-
-  return $form;
-}
-
 /**
- * Drupal form submit handler.
- */
-function form_search_projects_block_submit($form, &$form_state) {
-
-  // TODO: creates problems on concurrent requests!
-  if(!empty($form_state['values']['keyword'])) {
-    cache_set('search-keyword', $form_state['values']['keyword'], 'cache');
-  }
-
-  drupal_goto('search/projects');
-}
-
-/**
- * Implements hook_block_info().
+ * Implements hook_hook_info().
  *
- * @link https://api.drupal.org/api/function/hook_block_info/7 @endlink
+ * Note: this hook is used only by modules that define their own hooks.
+ * https://api.drupal.org/comment/60265#comment-60265
+ *
+ * Note: use this with extreme caution.
+ * https://drupal.stackexchange.com/q/77545#comment154878_77661
+ *
+ * @link http://nodesforbreakfast.com/node/7 Organize your module code with hook_hook_info() @endlink
+ * @link https://urbaninsight.com/node/264 Module and theme organization @endlink
  */
-function startupspark_block_info() {
-  $blocks['startup_filter'] = array(
-    'info'   => 'Filter of startups',
-    // https://api.drupal.org/api/drupal/includes!common.inc/group/block_caching/7
-    'cache'  => DRUPAL_NO_CACHE,
-    'status' => 1,
-    'region' => 'sidebar_first',
+function startupspark_hook_info() {
+  $hooks['block_info'] = array(
+    'group' => 'blocks',
+  );
+  //$hooks['block_configure'] = array(
+  //  'group' => 'blocks',
+  //);
+  $hooks['block_view'] = array(
+    'group' => 'blocks',
   );
 
-  return $blocks;
+  $hooks['form_alter'] = array(
+    'group' => 'forms',
+  );
+  return $hooks;
 }
 
 /**
- * Implements hook_block_view().
+ * Implements hook_user_login().
+ *
+ * @link http://dgo.to/683696/5679370 @endlink
  */
-function startupspark_block_view($delta = '') {
-  switch ($delta) {
-    case 'startup_filter':
-
-      $block['title'] = 'Фильтр';
-
-      // Prevent strict warning: "Only variables should be passed by reference".
-      // https://drupal.stackexchange.com/q/60411
-      $form = drupal_get_form('form_search_projects_block');
-
-      // Using this technique, you can encapsulate the js and css loading in your module_block_view
-      // https://api.drupal.org/api/function/hook_block_info/7#comment-50868
-      // https://api.drupal.org/api/function/drupal_add_css/7#comment-53463
-      $block['content'] = array(
-        '#markup' => drupal_render($form),
-        '#attached' => array('css' => array(STARTUPSPARK_ROOT . '/css/custom.css')),
-      );
-
-      return $block;
-  }
+function startupspark_user_login(&$edit, $account) {
+  $edit['redirect'] = get_redirect_path_on_login($account->uid);
 }
 
 /**
  * Implements hook_load().
+ *
+ * Note: Please remember to put the loader function in the same file
+ * where your menu function is in, it usually is the .module file.
+ * https://drupal.stackexchange.com/a/136609
  *
  * @link http://drupalace.ru/node/346 @endlink
  */
@@ -515,7 +426,7 @@ function startup_load($arg) {
     return $cache->data;
   }
 
-  // you must pass a STRING to ctype_digit function: http://php.net/ctype-digit#112040
+  // you must pass a STRING to ctype_digit function: https://php.net/ctype-digit#112040
   $is_id = ctype_digit((string)$arg);
 
   // fetch() should generally be avoided in favor of fetchObject() and fetchAssoc(),
@@ -524,7 +435,7 @@ function startup_load($arg) {
   $startup = db_select(STARTUPSPARK_SCHEMA_PREFIX . 'startup', 's')
     ->fields('s')
     ->condition($is_id ? 's.id' : 's.name', $arg)
-    ->range(0, 1) // get only one result: http://drupal.stackexchange.com/a/166593
+    ->range(0, 1) // get only one result: https://drupal.stackexchange.com/a/166593
     ->execute()
     ->fetchObject();
 
@@ -547,122 +458,10 @@ function startup_load($arg) {
   return $startup;
 }
 
-
-/**
- * Implements hook_form_alter().
- *
- * Сurrently Drupal runs hook_form_alter AFTER hook_form_FORM_ID_alter.
- * Some say it is safest to use hook_form_alter and a switch statement.
- * https://stackoverflow.com/q/2264301#comment2351220_2302029
- *
- * @link https://github.com/aramboyajyan/drupal7-boilerplate @endlink
- * @link https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7 @endlink
- */
-function startupspark_form_alter(&$form, &$form_state, $form_id) {
-
-  /**
-   * General overrides.
-   */
-  switch ($form['#id']) {
-
-    // User login form.
-    //case 'user-login':
-    //  break;
-
-    // User registration form.
-    case 'user-register-form':
-    //case 'user-register-form--2': // TODO: choose way to prevent possible dublicates
-      $form['account']['name']['#weight'] = 0;
-
-      // TODO: need to delete from release
-      form_set_error('mail', 'В данный момент в azure пока не настроена оправка e-mail.');
-      unset($form['account']['mail']['#description']);
-
-      $form['account']['label_main'] = array(
-        '#markup' => '<h3>Заполните учётные данные.</h3>',
-        '#weight'        => -1,
-      );
-      $form['account']['pass'] = array(
-        '#type'          => 'password_confirm',
-        '#required'      => TRUE,
-        // We need to remove the label to get a nice version: https://wp.me/p3PJLY-gP
-        '#title_display' => 'invisible',
-      );
-
-      // Add a checkbox to registration form about agreeing to terms of use.
-      // https://api.drupal.org/api/function/hook_form_FORM_ID_alter/7
-      $form['account']['terms_of_use'] = array(
-        '#type'          => 'checkbox',
-        // I agree with the website's terms and conditions.
-        //t('I certify that I am over the age of 18 years old.'),
-        '#title'         => 'Я подтверждаю, что мне больше 18 лет.',
-        '#required'      => TRUE,
-      );
-      // Drupal 7 FAPI - Using form states for conditional field display: http://knackforge.com/node/77
-      // how to change value of submit button of comment form? https://drupal.stackexchange.com/a/40563
-      $form['actions']['submit']['#states'] = array(
-        'enabled' => array(
-          ':input[name="terms_of_use"]' => array('checked' => TRUE),
-        ),
-      );
-      $form['actions']['submit']['#attributes'] = array('class' => array('btn-primary'));
-
-      break;
-  }
-
-  /**
-   * Specific overrides.
-   */
-  switch ($form_id) {
-
-    // Add missing bootstrap classes and role to search form.
-    // Темизация элементов формы поиска в Dpupal 7: http://master-web.info?p=3733
-    // TODO: you should change access to search box on `admin/people/permissions` page for non-admin users
-    // Search block not visible: http://dgo.to/1092502
-    case 'search_block_form':
-
-      $form['search_block_form']['#title_display'] = 'invisible'; // Toggle label visibilty
-      $form['search_block_form']['#attributes']['class'][] = 'form-control';
-      if (module_exists('select2')) {
-        $form['search_block_form']['#attributes']['class'][] = 'hidden';
-      }
-      $form['#attributes']['class'] = array('navbar-form');
-
-      if (module_exists('select2')) {
-        require_once DRUPAL_ROOT . '/includes/locale.inc'; // Necessary for country_get_list().
-        $select2 = array(
-          '#type' => 'select',
-          '#title' => 'Выберите страну (Select2 example)',
-
-          // If returned values are identical to displayed values, you can use drupal_map_assoc()
-          // https://api.drupal.org/api/drupal/developer!topics!forms_api_reference.html/7#options
-          '#options' => drupal_map_assoc(country_get_list()),
-          '#empty_option' => 'Выберите страну',
-          // https://select2.github.io/select2/#documentation
-          // https://select2.github.io/select2/#infinite
-          '#select2' => array(
-            'width' => '100%',
-            'allowClear' => FALSE, // display clear button
-            'placeholder' => 'Введите название',
-            'dropdownCssClass' => 'bigdrop', // apply css that makes the dropdown taller
-            'minimumInputLength' => 1,
-            'maximumInputLength' => 10,
-            'maximumSelectionSize' => 3,
-          ),
-        );
-
-        // https://php.net/array-merge
-        $form['search_block_form'] = array_merge($form['search_block_form'], $select2);
-      }
-
-      break;
-  }
-}
-
-
 /**
  * Implements hook_theme().
  *
+ * @link https://api.drupal.org/api/function/hook_theme/7 @endlink
  * @link https://stackoverflow.com/a/8258798 @endlink
  * @link https://github.com/aramboyajyan/drupal7-boilerplate/blob/master/boilerplate.module#L415 @endlink
  * @link http://writeyourcode.com?p=332 @endlink
@@ -676,8 +475,7 @@ function startupspark_theme($existing, $type, $theme, $path) {
   // Themable elements. Theme keys.
   return array(
     'startupspark_overview' => $base + array(
-      // your template filename
-      'template'  => 'overview', // leave off .tpl.php
+      'template'  => 'overview', // template filename, leave off .tpl.php
       'variables' => array(
         'startup' => NULL,
         'staff'   => NULL,
@@ -699,7 +497,8 @@ function startupspark_theme($existing, $type, $theme, $path) {
     ),
     // Display uploaded image
     'startupspark_thumb_upload' => array(
-      //'file'           => 'startupspark.module',
+      // The file the implementation resides in: https://stackoverflow.com/a/3521793
+      'file' => 'startupspark.theme.inc',
       'render element' => 'element',
       // https://drupal.stackexchange.com/a/106363
       //'variables' => array(
@@ -713,48 +512,6 @@ function startupspark_theme($existing, $type, $theme, $path) {
       //),
     )
   );
-}
-
-/**
- * Implements startupspark_thumb_upload theme callback.
- * Returns HTML for a managed file element with thumbnail.
- *
- * @link https://stackoverflow.com/a/31849073 @endlink
- * @link https://stackoverflow.com/a/32993171 @endlink
- */
-function theme_startupspark_thumb_upload($variables) {
-
-  // Hide/remove a upload/remove button from managed_file upload field:
-  // http://writeyourcode.com?p=330
-  //unset($variables['element']['upload_button'], $variables['element']['remove_button']);
-
-  // To hide the upload button: https://drupal.stackexchange.com/a/32359
-  //$element['upload_button']['#access'] = FALSE;
-
-  $element = $variables['element'];
-  $attributes = array();
-  if (isset($element['#id'])) {
-    $attributes['id'] = $element['#id'];
-  }
-  if (!empty($element['#attributes']['class'])) {
-    $attributes['class'] = (array) $element['#attributes']['class'];
-  }
-  $attributes['class'][] = 'form-managed-file';
-  $attributes['class'][] = 'media';
-  $output = '';
-  $output .= '<div' . drupal_attributes($attributes) . '>';
-  if (isset($element['#file']->uri)) {
-    $output .= '<div class="media-left">';
-    $output .= '<img class="media-object img-thumbnail" src="' . image_style_url('thumbnail', $element['#file']->uri) . '" />';
-    $output .= '</div>';
-    $element['filename']['#markup'] .= ' <span class="file-size">(' . format_size($element['#file']->filesize) . ')</span> ';
-    $element['filename']['#markup'] = '<div class="media-heading">' . $element['filename']['#markup'] . '</div>';
-  }
-  $output .= '<div class="image-widget-data media-body">';
-  $output .= drupal_render_children($element);
-  $output .= '</div>';
-  $output .= '</div>';
-  return $output;
 }
 
 function startup_title_callback($arg = NULL) {

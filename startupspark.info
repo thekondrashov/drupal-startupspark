@@ -1,3 +1,5 @@
+; Module information file. http://dgo.to/542202
+
 name = Startups park
 core = 7.x
 description = "
@@ -14,3 +16,5 @@ dependencies[] = jquery_update
 ; dependencies[] = elements
 
 configure = admin/config/content/startupspark
+
+; files[] = tests/startupspark.test
